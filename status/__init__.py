@@ -11,3 +11,5 @@ api = Blueprint('status', __name__)
 
 # Exposed Endpoints
 from status.controller import test
+
+from status.tasks import get_dac_status

@@ -1,15 +1,22 @@
 COMMON: &common
-    LOGGING: True
-    LOG_DIRECTORY: logs
-    LOG_FILE: 'status.log'
-    SECRET_KEY: 'cf875e6a24f845e29a824b5de962981d'
-    HOST: localhost
-    PORT: 4000
-    DEBUG: True
-    #SERVER_NAME: localhost
-    JSONIFY_PRETTYPRINT_REGULAR: true
+  LOGGING: True
+  LOG_DIRECTORY: logs
+  LOG_FILE: 'status.log'
+  SECRET_KEY: 'cf875e6a24f845e29a824b5de962981d'
+  HOST: localhost
+  PORT: 4000
+  DEBUG: True
+  #SERVER_NAME: localhost
+  JSONIFY_PRETTYPRINT_REGULAR: true
+  REDIS_URL: 'redis://localhost:6379'
+  STATUS_JSON: 'web/static/json/status.json'
+  ERDDAP_URL: 'http://data.ioos.us/gliders/erddap/tabledap/allDatasets.json'
+  DAC_API: 'http://data.ioos.us/test0992/api/deployment'
+
+DEVELOPMENT: &development
+  <<: *common
 
 PRODUCTION: &production
-  <<: &common
+  <<: *common
   DEBUG: False
 
