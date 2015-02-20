@@ -54,9 +54,11 @@ var DacStatus = (function init() {
         var now = moment().valueOf();
 
         // Fetch json_file
-        var xhr = $.ajax(status_url);
+        var xhr = $.ajax({
+            url: status_url,
+            dataType: "json"
+        });
         xhr.done(function(response) {
-
             // Store the status fetch time for display
             status_timestamp = response.meta.fetch_time;
 

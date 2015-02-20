@@ -40,7 +40,7 @@ def write_json(data):
 def get_dac_status():
     dac_api_url = app.config.get('DAC_API')
     erddap_url = app.config.get('ERDDAP_URL')
-    deployment_url_template = 'http://data.ioos.us/test0992/deployment/{:s}'
+    deployment_url_template = 'http://data.ioos.us/providers/deployment/{:s}'
     tds_url_template = 'http://data.ioos.us/gliders/thredds/dodsC/deployments/{:s}/{:s}/catalog.html?dataset=deployments/{:s}/{:s}/{:s}.nc3.nc'
     deployments = {
          'meta' : {
