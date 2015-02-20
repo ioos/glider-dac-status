@@ -1,0 +1,15 @@
+COMMON: &common
+    LOGGING: True
+    LOG_DIRECTORY: logs
+    LOG_FILE: 'status.log'
+    SECRET_KEY: 'cf875e6a24f845e29a824b5de962981d'
+    HOST: localhost
+    PORT: 4000
+    DEBUG: True
+    #SERVER_NAME: localhost
+    JSONIFY_PRETTYPRINT_REGULAR: true
+
+PRODUCTION: &production
+  <<: &common
+  DEBUG: False
+

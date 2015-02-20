@@ -1,0 +1,25 @@
+body {
+    font-size: 12px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-top: 50px;
+}
+
+th {
+    text-align: center;
+}
+
+.center {
+    text-align: center;
+}
+
+#utc-clock {
+    margin-top: 17px;
+}
+
+/*
+.popover {
+    max-width: 600px;
+}
+*/
+
