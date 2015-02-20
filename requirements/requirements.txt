@@ -9,4 +9,8 @@ aniso8601==0.92
 argparse==1.2.1
 itsdangerous==0.24
 pytz==2014.10
+celery==3.1.17
+redis==2.10.3
+requests==2.5.1
+Flask-Script==2.0.5
 
