@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}
+<title>Glider DAC Deployment Summary</title>
+{% endblock %}
+{% block head %}
+<link href="/lib/leaflet/dist/leaflet.css" rel="stylesheet" type="text/css">
+<link href="/app/summary.css" rel="stylesheet" type="text/css">
+<script src="/lib/leaflet/dist/leaflet.js" type="text/javascript"></script>
+<script src="/app/summary_templates.js" type="text/javascript"></script>
+<script src="/app/summary.js" type="text/javascript"></script>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-sm-12">
+      <div id="map-view">
+      </div>
+    </div>
+  </div> <!-- .row -->
+</div> <!-- .container-fluid -->
+<script type="text/javascript">
+var App = function() {
+}
+
+_.extend(App.prototype, Backbone.Events, {
+  collections: {
+    deployments: new DeploymentCollection(),
+  },
+  views: {
+    mapView: new MapView({el: $('#map-view')})
+  },
+  models: {
+  },
+  start: function() {
+    var self = this;
+    this.collections.deployments.fetch({reset:true});
+    this.listenTo(this.collections.deployments, 'reset', function(collection) {
+      collection.each(function(model) {
+        model.fetchGeoJSON();
+        self.listenTo(model, 'deployment:geojson', function(model) {
+          try {
+            self.views.mapView.addTrajectory(model.get('geo_json'));
+            console.log("Added " + model.get('deployment_dir'));
+          } catch(err) {
+            console.error("Invalid coordinates on " + model.get('deployment_dir'));
+          }
+        });
+      });
+    });
+  }
+});
+
+var app = new App();
+
+$(document).ready(function(){
+  app.start();
+});
+   
+
+</script>
+{% endblock %}
