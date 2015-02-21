@@ -1,0 +1,22 @@
+{
+  "name": "glider-dac-status",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ioos/glider-dac-status/"
+  },
+  "author": "Luke Campbell <LCampbell@ASAScience.com>",
+  "license": "ISC",
+  "devDependencies": {
+    "grunt-contrib-concat": "~0.5.1",
+    "grunt": "~0.4.5",
+    "bower": "~1.3.12",
+    "grunt-contrib-jst": "~0.6.0",
+    "grunt-contrib-watch": "~0.6.1"
+  }
+}

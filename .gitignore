@@ -2,3 +2,7 @@
 *.pyc
 logs/
 web/static/json/trajectories/
+web/npm_components/
+web/node_modules/
+web/static/app/
+web/static/lib/
