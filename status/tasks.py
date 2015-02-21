@@ -45,7 +45,7 @@ def get_trajectory(erddap_url):
     '''
     #http://data.ioos.us/gliders/erddap/tabledap/ru01-20140104T1621.json?latitude,longitude&trajectory=%22ru01-20140104T1621%22
     url = erddap_url.replace('html', 'json')
-    url += '?latitude,longitude'
+    url += '?longitude,latitude'
     response = requests.get(url)
     if response.status_code != 200:
         raise IOError("Failed to get trajectories")

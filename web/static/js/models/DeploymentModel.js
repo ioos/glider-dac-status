@@ -15,8 +15,21 @@ var DeploymentModel = Backbone.Model.extend({
     thredds: "",
     updated: null,
     username: "",
+    geo_json: {}, // Requires a separate fetch
     wmo_id: ""
-  }
+  },
+  fetchGeoJSON: function() {
+    var self = this;
+    var url = '/api/track/' + this.get('username') + '/' + this.get('name');
+    $.ajax({
+      url: url,
+      dataType: 'json',
+      success: function(data) {
+        self.set('geo_json', data);
+        self.trigger('deployment:geojson', self);
+      }
+    });
+  },
 });
 
 var DeploymentCollection = Backbone.Collection.extend({

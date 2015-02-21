@@ -13,11 +13,7 @@
 {% block body %}
 <div class="container-fluid">
   <div class="row">
-    <div class="col-sm-6">
-      <div id="summary-view">
-      </div> <!-- #summary-view -->
-    </div> <!-- .col-sm-6 -->
-    <div class="col-sm-6">
+    <div class="col-sm-12">
       <div id="map-view">
       </div>
     </div>
@@ -28,18 +24,30 @@ var App = function() {
 }
 
 _.extend(App.prototype, Backbone.Events, {
+  collections: {
+    deployments: new DeploymentCollection(),
+  },
   views: {
     mapView: new MapView({el: $('#map-view')})
   },
+  models: {
+  },
   start: function() {
-    var myLines = [{
-        "type": "LineString",
-        "coordinates": [[-100, 40], [-105, 45], [-110, 55]]
-    }, {
-        "type": "LineString",
-        "coordinates": [[-105, 40], [-110, 45], [-115, 55]]
-    }];
-    this.views.mapView.addTrajectory(myLines);
+    var self = this;
+    this.collections.deployments.fetch({reset:true});
+    this.listenTo(this.collections.deployments, 'reset', function(collection) {
+      collection.each(function(model) {
+        model.fetchGeoJSON();
+        self.listenTo(model, 'deployment:geojson', function(model) {
+          try {
+            self.views.mapView.addTrajectory(model.get('geo_json'));
+            console.log("Added " + model.get('deployment_dir'));
+          } catch(err) {
+            console.error("Invalid coordinates on " + model.get('deployment_dir'));
+          }
+        });
+      });
+    });
   }
 });
 

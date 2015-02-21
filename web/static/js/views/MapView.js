@@ -36,7 +36,7 @@ var MapView = Backbone.View.extend({
     var myStyle = {
         "color": "#ff7800",
         "weight": 5,
-        "opacity": 0.65
+        "opacity": 0.85
     };
 
     L.geoJson(feature, {
@@ -84,6 +84,10 @@ var MapView = Backbone.View.extend({
 				'Imagery © <a href="http://mapbox.com">Mapbox</a>',
 			id: 'examples.map-20v6611k'
 		}).addTo(map);
+    "http://maps.ngdc.noaa.gov/arcgis/rest/services/web_mercator/etopo1_hillshade/MapServer/tile/2/2/0"
+    var etopo = L.tileLayer('http://maps.ngdc.noaa.gov/arcgis/rest/services/web_mercator/etopo1_hillshade/MapServer/tile/{z}/{y}/{x}',{
+      attribution: 'NOAA NGDC ETOPO1'
+    });
     
 	
 		var Esri_WorldImagery = L.tileLayer('http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{	
@@ -98,7 +102,8 @@ var MapView = Backbone.View.extend({
     });     
 
     //HERE_hybridDay.addTo(map);    
-    OSM.addTo(this.map);
+    //OSM.addTo(this.map);
+    etopo.addTo(this.map);
     //Esri_WorldImagery.addTo(map);
     //Stamen_TonerHybrid.addTo(map);
 
