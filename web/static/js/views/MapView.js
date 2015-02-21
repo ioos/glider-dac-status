@@ -11,9 +11,16 @@
 var MapView = Backbone.View.extend({
 	initialize: function(options) {
 		var self = this;
+    _.bindAll(this, "onEachFeature", "highlight_layer", "reset_highlight");
     var center = [41.505, -80.09];
     var zoom = 3;
     var maxZoom = 18;
+
+    this.featureStyle = {
+        "color": "#ff7800",
+        "weight": 5,
+        "opacity": 0.85
+    };
 
     if(options && options.center) {
       center = options.center;
@@ -24,6 +31,7 @@ var MapView = Backbone.View.extend({
     if(options && options.maxZoom) {
       maxZoom = options.maxZoom;
     }
+
     this.map = L.map(this.el,{
 	       center: center,
 	       zoom: zoom,
@@ -33,42 +41,34 @@ var MapView = Backbone.View.extend({
     return this
 	},
   addTrajectory: function(feature) {
-    var myStyle = {
-        "color": "#ff7800",
-        "weight": 5,
-        "opacity": 0.85
-    };
-
     L.geoJson(feature, {
-        style: myStyle
+        style: this.featureStyle,
+        onEachFeature: this.onEachFeature
     }).addTo(this.map);
   },
-  example: function() {
-    var geojsonFeature = {
-      "type": "Feature",
-      "properties": {
-          "name": "Coors Field",
-          "amenity": "Baseball Stadium",
-          "popupContent": "This is where the Rockies play!"
+  onEachFeature: function(feature, layer) {
+    var self = this;
+    var popupContent = "No Popup Content";
+    if (feature.properties && feature.properties.popupContent) {
+      popupContent = feature.properties.popupContent;
+    }
+    layer.bindPopup(popupContent);
+    layer.on({
+      mouseover: function(e) {
+        self.highlight_layer(layer);
       },
-      "geometry": {
-          "type": "Point",
-          "coordinates": [-104.99404, 39.75621]
+      mouseout: function(e) {
+        self.reset_highlight(layer);
       }
-    };
-    L.geoJson(geojsonFeature).addTo(this.map);
-    console.log("Added point");
-
-    var myLines = [{
-        "type": "LineString",
-        "coordinates": [[-100, 40], [-105, 45], [-110, 55]]
-    }, {
-        "type": "LineString",
-        "coordinates": [[-105, 40], [-110, 45], [-115, 55]]
-    }];
-
-    console.log("Added lines");
-    this.map.setView([39.75, -104.99], 13);
+    });
+  },
+  highlight_layer: function(layer) {
+    if (layer._map != null) {
+      layer.setStyle({color: 'red'});
+    }
+  },
+  reset_highlight: function(layer) {
+    layer.setStyle(this.featureStyle);
   },
  	//renders a simple map view
 	render: function() {
@@ -77,16 +77,14 @@ var MapView = Backbone.View.extend({
    
     var map = this.map;
 
-		var OSM = L.tileLayer('https://{s}.tiles.mapbox.com/v3/{id}/{z}/{x}/{y}.png', {
-			maxZoom: 18,
-			attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, ' +
-				'<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
-				'Imagery © <a href="http://mapbox.com">Mapbox</a>',
-			id: 'examples.map-20v6611k'
-		}).addTo(map);
-    "http://maps.ngdc.noaa.gov/arcgis/rest/services/web_mercator/etopo1_hillshade/MapServer/tile/2/2/0"
     var etopo = L.tileLayer('http://maps.ngdc.noaa.gov/arcgis/rest/services/web_mercator/etopo1_hillshade/MapServer/tile/{z}/{y}/{x}',{
       attribution: 'NOAA NGDC ETOPO1'
+    });
+
+    var oceansBasemap = L.tileLayer('http://services.arcgisonline.com/ArcGIS/rest/services/Ocean_Basemap/MapServer/tile/{z}/{y}/{x}.jpg', {
+        minZoom: 1,
+        maxZoom: 12,
+        attribution: 'Sources: Esri, GEBCO, NOAA, National Geographic, DeLorme, HERE, Geonames.org, and other contributors'
     });
     
 	
@@ -101,12 +99,17 @@ var MapView = Backbone.View.extend({
       maxZoom: 20
     });     
 
-    //HERE_hybridDay.addTo(map);    
-    //OSM.addTo(this.map);
-    etopo.addTo(this.map);
-    //Esri_WorldImagery.addTo(map);
-    //Stamen_TonerHybrid.addTo(map);
+    oceansBasemap.addTo(this.map);
+    L.control.layers({
+      "ESRI OceansBaseMao" : oceansBasemap,
+      "NOAA ETOPO" : etopo,
+      "ESRI World Imagery" : Esri_WorldImagery
+    }).addTo(this.map);
 
     L.Util.requestAnimFrame(map.invalidateSize,map,!1,map._container);
 	},
+  redraw: function() {
+    console.log("Redraw");
+    this.map.invalidateSize();
+  }
 });
