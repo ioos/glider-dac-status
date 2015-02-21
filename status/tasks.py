@@ -5,8 +5,10 @@ status.tasks
 from app import celery, app
 from datetime import datetime
 from celery.utils.log import get_task_logger
+from urllib import urlencode
 import status.clocks as clock
 import json
+import os
 import logging
 import time
 import re
@@ -35,6 +37,60 @@ def write_json(data):
 
     logger.info('Updated %s', json_file)
     return True
+
+def get_trajectory(erddap_url):
+    '''
+    Reads the trajectory information from ERDDAP and returns a GEOJSON like
+    structure.
+    '''
+    #http://data.ioos.us/gliders/erddap/tabledap/ru01-20140104T1621.json?latitude,longitude&trajectory=%22ru01-20140104T1621%22
+    url = erddap_url.replace('html', 'json')
+    url += '?latitude,longitude'
+    response = requests.get(url)
+    if response.status_code != 200:
+        raise IOError("Failed to get trajectories")
+    data = response.json()
+    geo_data = {
+        'type' : 'LineString',
+        'coordinates' : data['table']['rows']
+    }
+    return geo_data
+
+def write_trajectory(deployment, geo_data):
+    '''
+    Writes a geojson like python structure to the appropriate data file
+    '''
+    trajectory_dir  = app.config.get('TRAJECTORY_DIR')
+    username = deployment['username']
+    name = deployment['name']
+    dir_path = os.path.join(trajectory_dir, username)
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    file_path = os.path.join(dir_path, name + '.json')
+    with open(file_path, 'wb') as f:
+        f.write(json.dumps(geo_data))
+
+
+@celery.task()
+def get_trajectory_features():
+    erddap_url      = app.config.get('ERDDAP_URL')
+    deployments_url = app.config.get('DAC_API')
+
+    response = requests.get(deployments_url)
+    if response.status_code != 200:
+        raise IOError("Failed to get response from DAC ACPI")
+    data = response.json()
+    deployments = data['results']
+    for d in deployments:
+        logger.info("Reading deployment %s", d['deployment_dir'])
+        try:
+            geo_data = get_trajectory(d['erddap'])
+            write_trajectory(d, geo_data)
+        except IOError:
+            logger.exception("Failed to get trajectory for %s", d['deployment_dir'])
+
+    return deployments
+
 
 @celery.task()
 def get_dac_status():
