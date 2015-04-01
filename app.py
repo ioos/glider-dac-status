@@ -54,10 +54,12 @@ app.wsgi_app = ReverseProxied(app.wsgi_app)
 
 from status import api as status_blueprint
 app.register_blueprint(status_blueprint, url_prefix='/api')
+
 from web import api as web_blueprint
 app.register_blueprint(web_blueprint)
 
-
+from navo import api as navo_blueprint
+app.register_blueprint(navo_blueprint, url_prefix='/navo')
 
 def main():
     '''
