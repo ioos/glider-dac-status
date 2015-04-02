@@ -16,8 +16,6 @@
 <div id="page-content">
   <div id="map-view">
   </div>
-  <div id="side-panel-view">
-  </div>
 </div>
 <script type="text/javascript">
 var App = function() {
@@ -26,11 +24,13 @@ var App = function() {
 _.extend(App.prototype, Backbone.Events, {
   collections: {
     deployments: new DeploymentCollection(),
+    selected: new DeploymentCollection(),
+    institutions: new InstitutionCollection()
   },
   views: {
     mapView: new MapView({el: $('#map-view')}),
     bannerView: new IOOSBannerView({el: $('#banner-view')}).render(),
-    sidePanelView: new SidePanelView({el: $('#side-panel-view') })
+    sidePanelView: null
   },
   models: {
     navoGlider: new NAVOGliderModel()
@@ -42,7 +42,13 @@ _.extend(App.prototype, Backbone.Events, {
     /* Models */
 
     /* Views */
+    /*
+    this.views.sidePanelView = new SidePanelView({
+      el: $('#side-panel-view'),
+      institutions: this.collections.institutions
+    });
     this.views.sidePanelView.render();
+    */
 
     /* Fetch */
     var deploymentFetch = this.collections.deployments.fetch({reset:true});
@@ -54,8 +60,24 @@ _.extend(App.prototype, Backbone.Events, {
       self.views.mapView.addTrajectory(feature);
     });
 
+    /*
+    this.listenTo(this.views.sidePanelView, 'onSelect', function(selection) {
+      if(selection === 'All Providers') {
+        self.collections.selected.reset(self.collections.deployments.models);
+      } else {
+        self.collections.selected.reset(self.collections.deployments.where({operator: selection}));
+      }
+      self.views.mapView.clear();
+    });
+    */
+
     this.listenTo(this.collections.deployments, 'reset', function(collection) {
-      console.log("Deployments fetched");
+      var operators = _.uniq(collection.pluck('operator'));
+      _.each(operators, function(operator) {
+        var institution = new InstitutionModel({name: operator});
+        self.collections.institutions.add(institution);
+      });
+      //self.views.sidePanelView.render();
       collection.each(function(model) {
         model.fetchGeoJSON();
         self.listenTo(model, 'deployment:geojson', function(model) {

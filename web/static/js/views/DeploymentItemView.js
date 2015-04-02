@@ -6,6 +6,7 @@
 
 var DeploymentItemView = Backbone.View.extend({
   tagName: 'li',
+  className: 'list-group-item',
   initialize: function() {
   },
   template: JST['static/js/partials/DeploymentItem.html'],

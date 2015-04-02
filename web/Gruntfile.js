@@ -25,9 +25,12 @@ module.exports = function(grunt) {
         },
         files: {
           "static/app/summary.js" : [
+            // Lib
+            "static/lib/bootstrap-select/dist/js/bootstrap-select.js",
             // Models
             "static/js/models/ColorPaletteModel.js",
             "static/js/models/DeploymentModel.js",
+            "static/js/models/InstitutionModel.js",
             "static/js/models/NAVOGliderModel.js",
             // Views
             "static/js/views/DeploymentItemView.js",
@@ -40,6 +43,7 @@ module.exports = function(grunt) {
       css: {
         files: {
           "static/app/summary.css" : [
+            "static/lib/bootstrap-select/dist/css/bootstrap-select.css",
             "static/css/Banner.css",
             "static/css/Map.css",
             "static/css/SidePanel.css"
