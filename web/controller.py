@@ -6,10 +6,11 @@ The controller for the web stuff
 '''
 
 from web import api
-from flask import render_template
+from flask import render_template, url_for
 
 @api.route('/')
 def index():
+    print url_for('.static', filename='index.html')
     return api.send_static_file('index.html')
 
 @api.route('/summary')

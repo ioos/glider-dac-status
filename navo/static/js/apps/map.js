@@ -39,9 +39,12 @@ _.extend(App.prototype, Backbone.Events, {
 
     /* Fetches */
     var trajectoryFetch = this.models.trajectory.fetch();
+
     $.when(trajectoryFetch).done(function() {
       var feature = self.models.trajectory.get('feature');
+
       feature.properties.popupContent = "Glider ng292";
+
       self.views.mapView.addTrajectory(feature);
     });
   }
