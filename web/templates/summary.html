@@ -85,7 +85,7 @@ _.extend(App.prototype, Backbone.Events, {
             var geo_json = model.get('geo_json');
             geo_json.properties = {popupContent: model.get('deployment_dir')};
             self.views.mapView.addTrajectory(geo_json);
-            self.views.sidePanelView.add(model);
+            //self.views.sidePanelView.add(model);
           } catch(err) {
             console.error(err);
             //console.error("Invalid coordinates on " + model.get('deployment_dir'));
