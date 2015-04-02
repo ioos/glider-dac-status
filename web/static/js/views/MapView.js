@@ -17,7 +17,7 @@ var MapView = Backbone.View.extend({
     var maxZoom = 18;
 
     this.colorPalette = new ColorPaletteModel();
-    var fetcher = this.colorPalette.fetch({url: 'static/json/colors/pastel.json', async: false});
+    var fetcher = this.colorPalette.fetch({url: 'static/json/colors/fruity.json', async: false});
     this.featureStyle = {
         "color": "#ff7800",
         "weight": 5,

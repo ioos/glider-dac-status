@@ -16,6 +16,8 @@
 <div id="page-content">
   <div id="map-view">
   </div>
+  <div id="side-panel-view">
+  </div>
 </div>
 <script type="text/javascript">
 var App = function() {
@@ -27,7 +29,8 @@ _.extend(App.prototype, Backbone.Events, {
   },
   views: {
     mapView: new MapView({el: $('#map-view')}),
-    bannerView: new IOOSBannerView({el: $('#banner-view')}).render()
+    bannerView: new IOOSBannerView({el: $('#banner-view')}).render(),
+    sidePanelView: new SidePanelView({el: $('#side-panel-view') })
   },
   models: {
     navoGlider: new NAVOGliderModel()
@@ -39,6 +42,7 @@ _.extend(App.prototype, Backbone.Events, {
     /* Models */
 
     /* Views */
+    this.views.sidePanelView.render();
 
     /* Fetch */
     var deploymentFetch = this.collections.deployments.fetch({reset:true});
@@ -59,6 +63,7 @@ _.extend(App.prototype, Backbone.Events, {
             var geo_json = model.get('geo_json');
             geo_json.properties = {popupContent: model.get('deployment_dir')};
             self.views.mapView.addTrajectory(geo_json);
+            self.views.sidePanelView.add(model);
           } catch(err) {
             console.error(err);
             //console.error("Invalid coordinates on " + model.get('deployment_dir'));
