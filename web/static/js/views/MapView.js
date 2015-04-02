@@ -16,6 +16,8 @@ var MapView = Backbone.View.extend({
     var zoom = 3;
     var maxZoom = 18;
 
+    this.colorPalette = new ColorPaletteModel();
+    var fetcher = this.colorPalette.fetch({url: 'static/json/colors/pastel.json', async: false});
     this.featureStyle = {
         "color": "#ff7800",
         "weight": 5,
@@ -41,8 +43,11 @@ var MapView = Backbone.View.extend({
     return this
 	},
   addTrajectory: function(feature) {
+    feature.properties.style = _.clone(this.featureStyle);
+    feature.properties.style.color = this.colorPalette.chooseColor();
+
     L.geoJson(feature, {
-        style: this.featureStyle,
+        style: feature.properties.style,
         onEachFeature: this.onEachFeature
     }).addTo(this.map);
   },
@@ -64,11 +69,12 @@ var MapView = Backbone.View.extend({
   },
   highlight_layer: function(layer) {
     if (layer._map != null) {
-      layer.setStyle({color: 'red'});
+      layer.setStyle({color: '#ddd'});
     }
   },
   reset_highlight: function(layer) {
-    layer.setStyle(this.featureStyle);
+    console.log(layer.feature);
+    layer.setStyle(layer.feature.geometry.properties.style);
   },
  	//renders a simple map view
 	render: function() {

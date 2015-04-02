@@ -11,18 +11,12 @@
 {% endblock %}
 
 {% block body %}
-<button id="sidebar-toggle" class="btn btn-default">
-  <span class="glyphicon glyphicon-align-justify"></span>
-</button>
-
-<div id="map_sidebar">
-  <div id="sidebar-content">
-    <div id="thumbnails" class="list-group">
-    </div>
+<div id='banner-view'>
+</div>
+<div id="page-content">
+  <div id="map-view">
   </div>
 </div>
-
-<div id="map-view"></div>
 <script type="text/javascript">
 var App = function() {
 }
@@ -32,19 +26,32 @@ _.extend(App.prototype, Backbone.Events, {
     deployments: new DeploymentCollection(),
   },
   views: {
-    mapView: new MapView({el: $('#map-view')})
+    mapView: new MapView({el: $('#map-view')}),
+    bannerView: new IOOSBannerView({el: $('#banner-view')}).render()
   },
   models: {
+    navoGlider: new NAVOGliderModel()
   },
   start: function() {
     var self = this;
-    this.collections.deployments.fetch({reset:true});
-    this.listenTo(this, 'app:toggle', function() {
-      setTimeout(function() {
-        self.views.mapView.redraw();
-      }, 500);
+    /* Collections */
+
+    /* Models */
+
+    /* Views */
+
+    /* Fetch */
+    var deploymentFetch = this.collections.deployments.fetch({reset:true});
+    var navoFetch = this.models.navoGlider.fetch();
+
+    $.when(navoFetch).done(function() {
+      var feature = self.models.navoGlider.get('feature');
+      feature.properties.popupContent = "navo/ng292";
+      self.views.mapView.addTrajectory(feature);
     });
+
     this.listenTo(this.collections.deployments, 'reset', function(collection) {
+      console.log("Deployments fetched");
       collection.each(function(model) {
         model.fetchGeoJSON();
         self.listenTo(model, 'deployment:geojson', function(model) {
