@@ -83,7 +83,12 @@ var MapView = Backbone.View.extend({
   },
   reset_highlight: function(layer) {
     console.log(layer.feature);
-    layer.setStyle(layer.feature.geometry.properties.style);
+    console.log(layer.feature.properties.style);
+    if(layer.feature.properties && layer.feature.properties.style) {
+      layer.setStyle(layer.feature.properties.style);
+    } else {
+      layer.setStyle(layer.feature.geometry.properties.style);
+    }
   },
  	//renders a simple map view
 	render: function() {
