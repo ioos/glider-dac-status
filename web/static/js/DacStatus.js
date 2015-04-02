@@ -8,8 +8,8 @@ var DacStatus = (function init() {
     var delta72 = 60*60*72*1000;
 
     // JSON urls
-    var status_url = './json/status.json';
-    var meta_base_url = './json/deployments';
+    var status_url = 'static/json/status.json';
+    var meta_base_url = 'static/json/deployments';
     
     // Data containers
     var status_datasets = [];

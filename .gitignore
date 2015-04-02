@@ -6,3 +6,8 @@ web/npm_components/
 web/node_modules/
 web/static/app/
 web/static/lib/
+patch
+navo/cache/*.txt
+navo/node_modules/
+navo/static/lib/
+config.local.yml

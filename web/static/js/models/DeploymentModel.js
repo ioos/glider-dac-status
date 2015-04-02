@@ -1,5 +1,5 @@
 var DeploymentModel = Backbone.Model.extend({
-  urlRoot: '/api/deployment',
+  urlRoot: '../api/deployment',
   defaults: {
     completed: null,
     created: null,
@@ -20,7 +20,7 @@ var DeploymentModel = Backbone.Model.extend({
   },
   fetchGeoJSON: function() {
     var self = this;
-    var url = '/api/track/' + this.get('username') + '/' + this.get('name');
+    var url = '../api/track/' + this.get('username') + '/' + this.get('name');
     $.ajax({
       url: url,
       dataType: 'json',
@@ -33,7 +33,7 @@ var DeploymentModel = Backbone.Model.extend({
 });
 
 var DeploymentCollection = Backbone.Collection.extend({
-  url: '/api/deployment',
+  url: '../api/deployment',
   model: DeploymentModel,
   parse: function(response) {
     if(response && response.results) {

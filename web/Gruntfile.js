@@ -6,6 +6,9 @@ module.exports = function(grunt) {
       compile: {
         files: {
           "static/app/summary_templates.js": [
+            "static/js/partials/DeploymentItem.html",
+            "static/js/partials/IOOSBanner.html",
+            "static/js/partials/SidePanel.html",
             "static/js/partials/Map.html"
           ]
         }
@@ -22,17 +25,28 @@ module.exports = function(grunt) {
         },
         files: {
           "static/app/summary.js" : [
+            // Lib
+            "static/lib/bootstrap-select/dist/js/bootstrap-select.js",
             // Models
+            "static/js/models/ColorPaletteModel.js",
             "static/js/models/DeploymentModel.js",
+            "static/js/models/InstitutionModel.js",
+            "static/js/models/NAVOGliderModel.js",
             // Views
-            "static/js/views/MapView.js"
+            "static/js/views/DeploymentItemView.js",
+            "static/js/views/IOOSBannerView.js",
+            "static/js/views/MapView.js",
+            "static/js/views/SidePanelView.js"
           ]
         }
       },
       css: {
         files: {
           "static/app/summary.css" : [
-            "static/css/Map.css"
+            "static/lib/bootstrap-select/dist/css/bootstrap-select.css",
+            "static/css/Banner.css",
+            "static/css/Map.css",
+            "static/css/SidePanel.css"
           ]
         }
       }

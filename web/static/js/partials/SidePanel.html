@@ -1,0 +1,16 @@
+<div class="side-panel">
+  <ul class="categories">
+    <li>
+      <select id="provider-select" name="provider" class="selectpicker">
+        <option value="-">All Providers</option>
+        <% institutions.each(function(institution) { %>
+          <% if(institution.get('name')) { %>
+            <option value="<%= institution.get('name') %>"><%= institution.get('name') %></option>
+          <% } %>
+        <% }); %>
+      </select>
+      <ul class="deployment-list list-group">
+      </ul>
+    </li>
+  </ul>
+</div>

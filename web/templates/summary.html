@@ -3,26 +3,20 @@
 <title>Glider DAC Deployment Summary</title>
 {% endblock %}
 {% block head %}
-<link href="lib/leaflet/dist/leaflet.css" rel="stylesheet" type="text/css">
-<link href="app/summary.css" rel="stylesheet" type="text/css">
-<script src="lib/leaflet/dist/leaflet.js" type="text/javascript"></script>
-<script src="app/summary_templates.js" type="text/javascript"></script>
-<script src="app/summary.js" type="text/javascript"></script>
+<link href="static/lib/leaflet/dist/leaflet.css" rel="stylesheet" type="text/css">
+<link href="static/app/summary.css" rel="stylesheet" type="text/css">
+<script src="static/lib/leaflet/dist/leaflet.js" type="text/javascript"></script>
+<script src="static/app/summary_templates.js" type="text/javascript"></script>
+<script src="static/app/summary.js" type="text/javascript"></script>
 {% endblock %}
 
 {% block body %}
-<button id="sidebar-toggle" class="btn btn-default">
-  <span class="glyphicon glyphicon-align-justify"></span>
-</button>
-
-<div id="map_sidebar">
-  <div id="sidebar-content">
-    <div id="thumbnails" class="list-group">
-    </div>
+<div id='banner-view'>
+</div>
+<div id="page-content">
+  <div id="map-view">
   </div>
 </div>
-
-<div id="map-view"></div>
 <script type="text/javascript">
 var App = function() {
 }
@@ -30,21 +24,60 @@ var App = function() {
 _.extend(App.prototype, Backbone.Events, {
   collections: {
     deployments: new DeploymentCollection(),
+    selected: new DeploymentCollection(),
+    institutions: new InstitutionCollection()
   },
   views: {
-    mapView: new MapView({el: $('#map-view')})
+    mapView: new MapView({el: $('#map-view')}),
+    bannerView: new IOOSBannerView({el: $('#banner-view')}).render(),
+    sidePanelView: null
   },
   models: {
+    navoGlider: new NAVOGliderModel()
   },
   start: function() {
     var self = this;
-    this.collections.deployments.fetch({reset:true});
-    this.listenTo(this, 'app:toggle', function() {
-      setTimeout(function() {
-        self.views.mapView.redraw();
-      }, 500);
+    /* Collections */
+
+    /* Models */
+
+    /* Views */
+    /*
+    this.views.sidePanelView = new SidePanelView({
+      el: $('#side-panel-view'),
+      institutions: this.collections.institutions
     });
+    this.views.sidePanelView.render();
+    */
+
+    /* Fetch */
+    var deploymentFetch = this.collections.deployments.fetch({reset:true});
+    var navoFetch = this.models.navoGlider.fetch();
+
+    $.when(navoFetch).done(function() {
+      var feature = self.models.navoGlider.get('feature');
+      feature.properties.popupContent = "navo/ng292";
+      self.views.mapView.addTrajectory(feature);
+    });
+
+    /*
+    this.listenTo(this.views.sidePanelView, 'onSelect', function(selection) {
+      if(selection === 'All Providers') {
+        self.collections.selected.reset(self.collections.deployments.models);
+      } else {
+        self.collections.selected.reset(self.collections.deployments.where({operator: selection}));
+      }
+      self.views.mapView.clear();
+    });
+    */
+
     this.listenTo(this.collections.deployments, 'reset', function(collection) {
+      var operators = _.uniq(collection.pluck('operator'));
+      _.each(operators, function(operator) {
+        var institution = new InstitutionModel({name: operator});
+        self.collections.institutions.add(institution);
+      });
+      //self.views.sidePanelView.render();
       collection.each(function(model) {
         model.fetchGeoJSON();
         self.listenTo(model, 'deployment:geojson', function(model) {
@@ -52,6 +85,7 @@ _.extend(App.prototype, Backbone.Events, {
             var geo_json = model.get('geo_json');
             geo_json.properties = {popupContent: model.get('deployment_dir')};
             self.views.mapView.addTrajectory(geo_json);
+            self.views.sidePanelView.add(model);
           } catch(err) {
             console.error(err);
             //console.error("Invalid coordinates on " + model.get('deployment_dir'));
