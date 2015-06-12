@@ -96,7 +96,7 @@ def get_trajectory_features():
 def get_dac_status():
     dac_api_url = app.config.get('DAC_API')
     erddap_url = app.config.get('ERDDAP_URL')
-    deployment_url_template = 'http://data.ioos.us/providers/deployment/{:s}'
+    deployment_url_template = 'http://data.ioos.us/gliders/providers/deployment/{:s}'
     tds_url_template = 'http://data.ioos.us/gliders/thredds/dodsC/deployments/{:s}/{:s}/catalog.html?dataset=deployments/{:s}/{:s}/{:s}.nc3.nc'
     deployments = {
          'meta' : {
