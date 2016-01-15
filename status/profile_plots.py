@@ -153,11 +153,11 @@ def main(args):
     '''
     for deployment in iter_deployments():
         try:
-            for deployment_filter in args.deployment:
+            for deployment_filter in args.deployment or []:
                 if deployment_filter in deployment['deployment_dir']:
                     break
             else:
-                if args:
+                if args.deployment:
                     continue
             print deployment['deployment_dir']
             path = os.path.join(args.path, deployment['deployment_dir'])
