@@ -133,7 +133,11 @@ def plot_deployment(deployment, path):
     with Dataset(thredds_url, 'r') as nc:
         for parameter in PARAMETERS:
                 filename = os.path.join(path, '%s.png' % parameter)
-                plot_from_nc(deployment['name'], nc, parameter, filename)
+                try:
+                    plot_from_nc(deployment['name'], nc, parameter, filename)
+                except Exception as e:
+                    print "Failed to generate plot for %s" % parameter
+                    continue
                 print filename
 
 def flipped_profiles(y):
