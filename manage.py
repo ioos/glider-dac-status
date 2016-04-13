@@ -18,18 +18,6 @@ def get_trajectory_features():
     result.wait()
 
 @manager.command
-def get_email():
-    from navo.email_extractor import process
-    with app.app_context():
-        process()
-
-@manager.command
-def update_trajectory_cache():
-    from navo.tasks import update_cache
-    with app.app_context():
-        update_cache()
-
-@manager.command
 def list_routes():
     import urllib
     output = []
