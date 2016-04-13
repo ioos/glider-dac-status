@@ -7,7 +7,5 @@ web/node_modules/
 web/static/app/
 web/static/lib/
 patch
-navo/cache/*.txt
-navo/node_modules/
-navo/static/lib/
+navo/configs/*.yml
 config.local.yml

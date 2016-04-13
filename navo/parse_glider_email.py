@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 '''
-navo/tasks.py
+navo/parse_glider_email.py
 
 Author: Luke Campbell
 
@@ -146,14 +146,6 @@ def main(args):
     else:
         with open(args.output, 'w') as csvfile:
             dump_csv(csfile, sorted_records)
-
-def update_cache():
-    from flask import current_app as app
-    cache = app.config['GLIDER_EMAIL']['OUTPUT_DIRECTORY']
-    path = 'navo/static/json/trajectories.json'
-    sorted_records = get_sorted_records(cache)
-    with open(path, 'w') as f:
-        dump_json(f, sorted_records)
 
 if __name__ == '__main__':
     import argparse
