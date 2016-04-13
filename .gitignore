@@ -1,7 +1,7 @@
 *.swp
 *.pyc
 logs/
-web/static/json/trajectories/
+web/static/json/trajectories/*.json
 web/npm_components/
 web/node_modules/
 web/static/app/
