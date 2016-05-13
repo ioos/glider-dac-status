@@ -1,11 +1,13 @@
 #!/usr/bin/env python
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 import matplotlib
 matplotlib.use('AGG')
 
 from netCDF4 import Dataset
 from netcdftime.netcdftime import utime
+from functools import wraps
+from scipy import interpolate
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
@@ -14,23 +16,36 @@ import os
 import requests
 import sys
 import cmocean
+import time
+
+
+def time_function(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        t0 = time.time()
+        retval = f(*args, **kwargs)
+        t1 = time.time()
+        print '{} took {} s'.format(f.__name__, t1-t0)
+        return retval
+    return wrapper
+
 
 PARAMETERS = {
-    'temperature' : {
+    'temperature': {
         'cmap': cmocean.cm.temp,
-        'display' : u'Temperature (°C)'
+        'display': u'Temperature (°C)'
     },
-    'salinity' : {
-        'cmap' : cmocean.cm.salinity,
-        'display' : u'Salinity (1e-3)'
+    'salinity': {
+        'cmap': cmocean.cm.salinity,
+        'display': u'Salinity (1e-3)'
     },
     'conductivity': {
-        'cmap' : cmocean.cm.salinity,
-        'display' : u'Conductivity (S m-1)'
+        'cmap': cmocean.cm.salinity,
+        'display': u'Conductivity (S m-1)'
     },
-    'density' : {
-        'cmap' : cmocean.cm.density,
-        'display' : u'Density (kg m-3)',
+    'density': {
+        'cmap': cmocean.cm.density,
+        'display': u'Density (kg m-3)',
     }
 }
 
@@ -67,7 +82,7 @@ def generate_profile_plot(x, y, z, cmap, title='Glider Profiles', ylabel='Pressu
     :param str zlabel: The label to display along the color bar legend
     '''
     fig, ax = plt.subplots()
-    im = ax.pcolor(x, y, z, cmap=cmap)
+    im = ax.pcolormesh(x, y, z, cmap=cmap)
     ax.set_title(title)
     ax.invert_yaxis()
     date_format = mdates.DateFormatter('%Y-%m-%d')
@@ -78,6 +93,7 @@ def generate_profile_plot(x, y, z, cmap, title='Glider Profiles', ylabel='Pressu
     fig.autofmt_xdate()
 
     return fig
+
 
 def plot_from_nc(title, nc, parameter, filepath):
     '''
@@ -90,18 +106,13 @@ def plot_from_nc(title, nc, parameter, filepath):
     :param str parameter: Parameter to plot
     :param str filepath: Location to save the figure to (PNG)
     '''
-    y = nc.variables['pressure'][0,:,:]
-    if flipped_profiles(y):
-        x = nc.variables['time'][0,::2]
-        y = nc.variables['pressure'][0,::2,:]
-        z = nc.variables[parameter][0,::2,:]
-    else:
-        z = nc.variables[parameter][0,:,:]
-        x = nc.variables['time'][0,:]
-        
-    mask = np.isnan(z) | z.mask
-    z[mask] = ma.masked
-    y[mask] = ma.masked
+    x, y, z = get_variables(nc, parameter)
+    total_mask = y.mask | z.mask | np.isnan(y) | np.isnan(z)
+    y.mask = total_mask
+    z.mask = total_mask
+
+    fix_profiles(y, z)
+    stretch_and_fill(y, z)
 
     x = get_times(nc, x, z)
 
@@ -110,6 +121,13 @@ def plot_from_nc(title, nc, parameter, filepath):
     fig.set_size_inches(20, 5)
     fig.savefig(filepath, dpi=100)
     plt.close(fig)
+
+
+def get_variables(nc, parameter):
+    y = nc.variables['pressure'][0, :, :]
+    z = nc.variables[parameter][0, :, :]
+    x = nc.variables['time'][0, :]
+    return x, y, z
 
 
 def iter_deployments():
@@ -122,6 +140,7 @@ def iter_deployments():
     results = response.json()
     for deployment in results['results']:
         yield deployment
+
 
 def plot_deployment(deployment, path):
     '''
@@ -140,16 +159,48 @@ def plot_deployment(deployment, path):
                     continue
                 print filename
 
-def flipped_profiles(y):
+
+def fix_profiles(y, z):
     '''
-    Returns True if the profiles zig-zag.
-    :param numpy.ndarray y: A multidimensional array of depth or pressure values
+    Inverts the profile in-place if it is an upcast, so the mesh has a correct y-axis
     '''
-    first = y[0]
-    second = y[1]
-    first = first[~first.mask]
-    second = second[~second.mask]
-    return (second[0] - first[0]) > (first[-1] / 2)
+    for i in xrange(y.shape[0]):
+        # if profile is flipped
+        if len(y[i][~y[i].mask]) and y[i][~y[i].mask][0] > y[i][~y[i].mask][-1]:
+            y[i][~y[i].mask] = y[i][~y[i].mask][::-1]
+            z[i][~z[i].mask] = z[i][~z[i].mask][::-1]
+
+
+def stretch_and_fill(y, z):
+    '''
+    Fills missing and corrupt data with interpolated values to fill the
+    quadrilateral so it can be plotted in the mesh
+    '''
+
+    for i in xrange(y.shape[0]):
+        total_mask = y[i].mask | z[i].mask
+        depths = y[i][~total_mask]
+        values = z[i][~total_mask]
+
+        depth_mask = (depths < 0)
+
+        depths = depths[~depth_mask]
+        values = values[~depth_mask]
+
+        depths, index = np.unique(depths, return_index=True)
+        values = values[index]
+
+        if depths.shape[0] < 2:
+            y[i].mask = np.ones(y.shape[1], dtype='bool')
+            z[i].mask = np.ones(z.shape[1], dtype='bool')
+            continue
+
+        f_y = interpolate.interp1d(np.linspace(0, 1, depths.shape[0]), depths)
+        f_z = interpolate.interp1d(depths, values)
+
+        y[i] = f_y(np.linspace(0, 1, y.shape[1]))
+        z[i] = f_z(y[i])
+
 
 def main(args):
     '''
@@ -168,12 +219,10 @@ def main(args):
             if not os.path.exists(path):
                 os.makedirs(path)
             plot_deployment(deployment, path)
-        except Exception as e:
+        except Exception:
             print "Error processing"
             from traceback import print_exc
             print_exc()
-
-
 
     return 0
 
