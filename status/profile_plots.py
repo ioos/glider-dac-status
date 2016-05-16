@@ -107,6 +107,13 @@ def plot_from_nc(title, nc, parameter, filepath):
     :param str filepath: Location to save the figure to (PNG)
     '''
     x, y, z = get_variables(nc, parameter)
+
+    # Remove empty timesteps
+    if hasattr(x, 'mask'):
+        y = y[~x.mask]
+        z = z[~x.mask]
+        x = x[~x.mask]
+
     total_mask = y.mask | z.mask | np.isnan(y) | np.isnan(z)
     y.mask = total_mask
     z.mask = total_mask
@@ -199,7 +206,7 @@ def stretch_and_fill(y, z):
         f_z = interpolate.interp1d(depths, values)
 
         y[i] = f_y(np.linspace(0, 1, y.shape[1]))
-        z[i] = f_z(y[i])
+        z[i] = f_z(y[i].compressed())
 
 
 def main(args):
