@@ -15,3 +15,4 @@ requests==2.5.1
 Flask-Script==2.0.5
 matplotlib==1.5.1
 cmocean==0.1
+scipy
