@@ -1,0 +1,59 @@
+<div class="alert alert-danger alert-dismissable" role="alert">
+  <button type="button" class="close" data-dismiss="alert" arial-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+  <h3 class="center">Incomplete Datasets</h3>
+  Either/both the ERDDAP tabledap and THREDDS end-points do not exist for the
+  following datasets.  The <b>Created &#40;Z&#41;</b> column displays the
+  creation time of the deployment and is color-coded to indicate lag time.
+  Click the Help button in the top navigation bar to see the color legend.
+</div>
+
+<table id="status" class="table table-condensed sortable">
+  <thead>
+    <tr>
+      <th>Deployment</th>
+      <th>Provider</th>
+      <th>Operator</th>
+      <th>WMO ID</th>
+      <th data-firstsort="desc">Created &#40;Z&#41;</th>
+      <th data-defaultsort="disabled">ERDDAP</th>
+      <th data-firstsort="desc">Time Coverage<br />Start &#40;Z&#41;</th>
+      <th data-firstsort="desc">Time Coverage<br />End &#40;Z&#41;</th>
+      <th data-defaultsort="disabled">THREDDS</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#.}}
+    <tr>
+      <td>
+        <a href="{{dac_url}}" target="_blank">{{name}}</a>
+        {{#completed}}
+        <i class="fa fa-check-circle-o fa-lg" rel="popover" data-content="Deployment has been marked as completed.  No additional files will be added to the dataset." />
+        {{/completed}}
+      </td>
+      <td>{{username}}</td>
+      <td>{{operator}}</td>
+      <td>{{wmo_id}}</td>
+      <td class="center {{created-status}}">{{{created}}}</td>
+      <td class="center">
+        {{#tabledap}}
+        <a href="{{tabledap}}" target="_blank">
+          <i class="fa fa-cloud-download fa-lg" rel="popover" data-content="Go to the ERDDAP tabledap data download page"></i>
+          {{/tabledap}}
+        </a>
+      </td>
+      <td class="center">{{{start}}}</td>
+      <td class="center">{{{end}}}</td>
+      <td class="center">
+        {{#tds}}
+        <a href="{{tds}}" target="_blank">
+          <i class="fa fa-cloud-download fa-lg" rel="popover" data-content="Go to the THREDDS dataset catalog page" data-placement="left" />
+        </a>
+      {{/tds}}
+      </td>
+    </tr>
+  {{/.}}
+  </tbody>
+</table>
+

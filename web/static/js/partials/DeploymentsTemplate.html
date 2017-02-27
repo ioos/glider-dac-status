@@ -1,0 +1,88 @@
+<table id="deployments" class="table table-condensed sortable">
+  <thead>
+    <th></th>
+    <th>Deployment</th>
+    <th>Operator/<br />Provider</th>
+    <th>WMO ID</td>
+    <th data-defaultsort="disabled">ERDDAP</th>
+    <th data-defaultsort="disabled">Graph</th>
+    <th data-defaultsort="disabled">Metadata</th>
+    <th>&#35; Profiles</th>
+    <th data-firstsort="desc">Time Coverage<br />Start &#40;Z&#41;</th>
+    <th data-firstsort="desc">Time Coverage<br />End &#40;Z&#41;</th>
+    <th data-defaultsort="disabled">THREDDS</th>
+    <th data-defaultsort="disabled">RSS</th>
+  </thead>
+  <tbody>
+    {{#.}}
+    <tr class="{{data-status}}">
+      <td>
+        {{#data-status}}
+        <i class="fa fa-warning fa-lg" rel="popover" data-content="Dataset is missing
+        either/both the ERDDAP or THREDDS end-point."></i>
+        {{/data-status}}
+      </td>
+      <td>
+        <a href="{{dac_url}}" target="_blank">{{name}}</a>
+        {{#completed}}
+        <i class="fa fa-check-circle-o fa-lg" rel="popover" data-content="Deployment
+        has been marked as completed.  No additional data files will be added to the
+        dataset."></i>
+        {{/completed}}
+      </td>
+      <td class="center">{{operator}}
+        <br />{{username}}
+      </td>
+      <td class="center">
+        {{wmo_id}}
+      </td>
+      <td class="center">
+        {{#tabledap}}
+        <a href="{{tabledap}}" target="_blank">
+          <i class="fa fa-cloud-download fa-lg" rel="popover" data-content="Go to the
+        ERDDAP tabledap data download page" />
+          {{/tabledap}}
+        </a>
+      </td>
+      <td class="center">
+        {{#graph}}
+        <a href="{{graph}}" target="_blank">
+          <i class="fa fa-picture-o fa-lg" rel="popover" data-content="Go to the ERDDAP tabledap graphing page" />
+          {{/graph}}
+        </a>
+      </td>
+      <td class="center">
+        {{#meta}}
+        <a href="{{meta}}.htmlTable" target="_blank">
+          <i class="fa fa-external-link fa-lg" rel="popover" data-content="Go to the ERDDAP tabledap dataset metadata page" />
+          {{/meta}}
+        </a>
+      </td>
+      <td class="center">
+        {{num_profiles}}
+      </td>
+      <td class="center">
+        {{{start}}}
+      </td>
+      <td class="center {{time-coverage-status}}">
+        {{{end}}}
+      </td>
+      <td class="center">
+        {{#tds}}
+        <a href="{{tds}}" target="_blank">
+          <i class="fa fa-cloud-download fa-lg" rel="popover" data-content="Go to the THREDDS dataset catalog page" data-placement="left" />
+          {{/tds}}
+        </a>
+      </td>
+      <td class="center">
+        {{#rss}}
+        <a href="{{rss}}" target="_blank">
+          <i class="fa fa-rss fa-lg" rel="popover" data-content="Display the ERDDAP dataset RSS feed which provides the current status of the dataset." data-placement="left" />
+          {{/rss}}
+        </a>
+      </td>
+    </tr>
+    {{/.}}
+  </tbody>
+</table>
+
