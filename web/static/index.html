@@ -37,6 +37,7 @@
         <li><a href="#" id="all-datasets">All Datasets</a></li>
         <li class="active"><a href="#" id="incomplete-datasets">Status</a></li>
         <li><a href="#" id="latest">Latest</a></li>
+        <li><a href="#" id="blacklisted">Not Archiving</a></li>
         <li class="dropdown">
         <a href="#" 
           class="dropdown-toggle" data-toggle="dropdown"
@@ -76,7 +77,6 @@
         <ul id="wmo-dropdown" class="dropdown-menu" role="menu">
         </ul>
         </li>
-        <li><a href="./summary/">Summary Map</a></li>
 
       </ul>
       <form class="navbar-form navbar-right" role="search">
@@ -235,16 +235,19 @@
 $(function() {
   console.log("Fetching templates");
   var templates = {};
-  var fetches = [];
-  var fetchDeployments = $.get('static/js/partials/DeploymentsTemplate.html', function(template, textStatus, jqXHR) {
-    templates['DeploymentsTemplate.html'] = template;
-    console.log("DeploymentsTemplate fetched");
+  var templateResources = [
+    'static/js/partials/DeploymentsTable.html',
+    'static/js/partials/StatusTable.html',
+    'static/js/partials/BlacklistedAlert.html',
+  ];
+  var fetches = _.map(templateResources, function(resource) {
+    return $.get(resource, function(template, textStatus, jqXHR) {
+      var tokens = resource.split('/');
+      var resourceName = tokens[tokens.length-1];
+      templates[resourceName] = template;
+      console.log("Loaded", resourceName);
+    });
   });
-
-  var fetchStatusTable = $.get('static/js/partials/StatusTable.html', function(template, textStatus, jqXHR) {
-    templates['StatusTable.html'] = template;
-  });
-  fetches.push(fetchStatusTable);
 
   $.when.apply($, fetches).done(function() {
     console.log("initializing DAC Status");
