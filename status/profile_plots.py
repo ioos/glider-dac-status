@@ -52,9 +52,8 @@ PARAMETERS = {
 
 def get_times(nc, x, z):
     '''
-    Converts an array of timestamps to the matplotlib epoch (SERIOUSLY!? Why in
-    the hell would you use that for an epoch?!) and builds a meshgrid of the
-    timestamps for each profile
+    Converts an array of timestamps to the matplotlib epoch and builds a
+    meshgrid of the timestamps for each profile
 
     :param netCDF4.Dataset nc: An open netCDF file
     :param numpy.ndarray x: An array of time values
@@ -152,6 +151,7 @@ def iter_deployments():
 def plot_deployment(deployment, path):
     '''
     Plot the parameters for a deployment
+
     :param dict deployment: A deployment object
     :param str path: Folder path to where to store the images
     '''
