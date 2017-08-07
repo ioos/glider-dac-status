@@ -230,10 +230,16 @@ def get_dac_status():
                 t1_epoch = clock.erddap_ts2epoch(t1_match.groups()[0])
 
             # Add the time coverages
-            meta['ts0'] = t0_match.groups()[0]
-            meta['ts1'] = t1_match.groups()[0]
-            meta['start'] = t0_epoch * 1000
-            meta['end'] = t1_epoch * 1000
+            # badams: if a start or end time regex fails to match, don't try to
+            # access attributes
+            # TODO: May want to access time variable in lieu of
+            # time_coverage_start/time_coverage_end
+            if t0_match is not None:
+                meta['ts0'] = t0_match.groups()[0]
+                meta['start'] = t0_epoch * 1000
+            if t1_match is not None:
+                meta['ts1'] = t1_match.groups()[0]
+                meta['end'] = t1_epoch * 1000
 
             if dataset_id.find('all') == -1 and dataset_id.find('development') == -1:
                 json_url = meta['tabledap'] + '.json'
