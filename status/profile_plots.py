@@ -81,8 +81,8 @@ def generate_profile_plot(x, y, z, cmap, title='Glider Profiles', ylabel='Pressu
     :param str zlabel: The label to display along the color bar legend
     '''
     fig, ax = plt.subplots()
-    std = np.std(z)
-    mean = np.mean(z)
+    std = np.nanstd(z)
+    mean = np.nanmean(z)
     vmin = mean - 2 * std
     vmax = mean + 2 * std
     if vmin < 0:
