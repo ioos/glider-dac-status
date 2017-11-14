@@ -81,7 +81,13 @@ def generate_profile_plot(x, y, z, cmap, title='Glider Profiles', ylabel='Pressu
     :param str zlabel: The label to display along the color bar legend
     '''
     fig, ax = plt.subplots()
-    im = ax.pcolormesh(x, y, z, cmap=cmap)
+    std = np.nanstd(z)
+    mean = np.nanmean(z)
+    vmin = mean - 2 * std
+    vmax = mean + 2 * std
+    if vmin < 0:
+        vmin = 0
+    im = ax.pcolormesh(x, y, z, cmap=cmap, vmin=vmin, vmax=vmax)
     ax.set_title(title)
     ax.invert_yaxis()
     date_format = mdates.DateFormatter('%Y-%m-%d')
@@ -232,6 +238,7 @@ def main(args):
             print_exc()
 
     return 0
+
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
