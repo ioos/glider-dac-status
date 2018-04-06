@@ -14,6 +14,7 @@ import time
 import re
 import collections
 import requests
+import glob
 
 logger = get_task_logger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -100,6 +101,7 @@ def get_trajectory_features():
 def get_dac_status():
     dac_api_url = app.config.get('DAC_API')
     erddap_url = app.config.get('ERDDAP_URL')
+    file_dir = app.config.get('FILE_DIR')
     deployment_url_template = 'http://data.ioos.us/gliders/providers/deployment/{:s}'
     tds_url_template = 'http://data.ioos.us/gliders/thredds/dodsC/deployments/{:s}/{:s}/catalog.html?dataset=deployments/{:s}/{:s}/{:s}.nc3.nc'
     deployments = {
@@ -270,6 +272,30 @@ def get_dac_status():
                                               meta['username'],
                                               meta['name'],
                                               meta['name'])
+        meta['potential_invalid_files'] = []
+        if file_dir is not None:
+            deployment_loc = os.path.join(file_dir, meta['deployment_dir'])
+            logger.info('Fetching DAC raw files from {}'.format(deployment_loc))
+            # count of all the netCDF files in the particular directory
+            dep_nc_files = glob.glob(os.path.join(deployment_loc, '*.nc'))
+            meta['nc_files_count'] = len(dep_nc_files)
+            try:
+                latest_nc_file = max(dep_nc_files, key=os.path.getmtime)
+            # if empty, set the netCDF files to None
+            except ValueError:
+                meta['latest_nc_file'] = None
+                meta['nc_file_last_update'] = None
+            else:
+                meta['latest_nc_file'] = os.path.basename(latest_nc_file)
+                latest = int(os.path.getmtime(latest_nc_file) * 1000)
+
+                meta['nc_file_last_update'] = latest
+        # if the file_dir variable is None, just leave the keys empty
+        else:
+            for key in ('nc_files_count', 'latest_nc_file',
+                        'nc_file_last_update'):
+                meta[key] = None
+
         logger.info('Fetching THREDDS catalog: %s', tds_das_url)
         tds_request = requests.get(tds_das_url)
         meta['tds'] = None

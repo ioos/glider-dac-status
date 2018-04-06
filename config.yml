@@ -13,6 +13,7 @@ COMMON: &common
   TRAJECTORY_DIR: 'web/static/json/trajectories/'
   ERDDAP_URL: 'http://data.ioos.us/gliders/erddap/tabledap/allDatasets.json'
   DAC_API: 'http://data.ioos.us/gliders/providers/api/deployment'
+  FILE_DIR: '/data/data_dir/'
   GLIDER_EMAIL:
     EMAIL_ACCOUNT: "xxxxxxxxxxxxxxxxxxxxxxxxx"
     EMAIL_PASSWORD: "xxxxxxxxxxxxxxxxxxxxxxxxx"
