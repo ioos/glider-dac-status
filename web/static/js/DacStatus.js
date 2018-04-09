@@ -298,6 +298,9 @@
     if (record.updated) {
       record.updated = moment.utc(record.updated).format('YYYY-MM-DD<br />HH:mm');
     }
+    if (record.nc_file_last_update) {
+      record.start = moment.utc(record.start).format('YYYY-MM-DD<br />HH:mm');
+    }
     if (record.start) {
       record.start = moment.utc(record.start).format('YYYY-MM-DD<br />HH:mm');
     }
