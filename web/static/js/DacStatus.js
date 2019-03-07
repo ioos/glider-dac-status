@@ -204,7 +204,6 @@
 
 
   DacStatus.prototype.onClickIncompleteDatasets = function(event) {
-    console.log("incomplete");
     if(typeof event !== "undefined") {
       event.preventDefault();
       // Set/remove .active on relevant navbar list-items

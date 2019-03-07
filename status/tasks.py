@@ -5,7 +5,7 @@ status.tasks
 from app import celery, app
 from datetime import datetime
 from celery.utils.log import get_task_logger
-from urllib import urlencode
+from urllib.parse import urlencode
 import status.clocks as clock
 import json
 import os
@@ -129,7 +129,7 @@ def get_dac_status():
         'rss': 'rss',
         'summary': 'summary'
     }
-    columns = variables.keys()
+    columns = list(variables.keys())
     # Time coverage regexs
     t0_re = re.compile(
         'time_coverage_start\s"(\d{4}\-\d{2}\-\d{2}T\d{2}:\d{2}:\d{2}Z)"')
@@ -263,7 +263,7 @@ def get_dac_status():
                 if len(profiles) > 0:
                     meta['num_profiles'] = max(profiles)
 
-        for name in dac_record.keys():
+        for name in list(dac_record.keys()):
             meta[name] = dac_record[name]
 
         # Try to fetch the THREDDS .das to see if the dataset exists
@@ -304,7 +304,7 @@ def get_dac_status():
 
         # Add the deployment metadata to the return object
         deployments['datasets'].append(collections.OrderedDict(
-            sorted(meta.items(), key=lambda t: t[0])))
+            sorted(list(meta.items()), key=lambda t: t[0])))
 
     status = write_json(deployments)
     return status

@@ -25,7 +25,7 @@ def time_function(f):
         t0 = time.time()
         retval = f(*args, **kwargs)
         t1 = time.time()
-        print '{} took {} s'.format(f.__name__, t1-t0)
+        print('{} took {} s'.format(f.__name__, t1-t0))
         return retval
     return wrapper
 
@@ -33,19 +33,19 @@ def time_function(f):
 PARAMETERS = {
     'temperature': {
         'cmap': cmocean.cm.temp,
-        'display': u'Temperature (°C)'
+        'display': 'Temperature (°C)'
     },
     'salinity': {
         'cmap': cmocean.cm.salinity,
-        'display': u'Salinity (1e-3)'
+        'display': 'Salinity (1e-3)'
     },
     'conductivity': {
         'cmap': cmocean.cm.salinity,
-        'display': u'Conductivity (S m-1)'
+        'display': 'Conductivity (S m-1)'
     },
     'density': {
         'cmap': cmocean.cm.density,
-        'display': u'Density (kg m-3)',
+        'display': 'Density (kg m-3)',
     }
 }
 
@@ -168,16 +168,16 @@ def plot_deployment(deployment, path):
                 try:
                     plot_from_nc(deployment['name'], nc, parameter, filename)
                 except Exception as e:
-                    print "Failed to generate plot for %s" % parameter
+                    print("Failed to generate plot for %s" % parameter)
                     continue
-                print filename
+                print(filename)
 
 
 def fix_profiles(y, z):
     '''
     Inverts the profile in-place if it is an upcast, so the mesh has a correct y-axis
     '''
-    for i in xrange(y.shape[0]):
+    for i in range(y.shape[0]):
         # if profile is flipped
         if len(y[i][~y[i].mask]) and y[i][~y[i].mask][0] > y[i][~y[i].mask][-1]:
             y[i][~y[i].mask] = y[i][~y[i].mask][::-1]
@@ -190,7 +190,7 @@ def stretch_and_fill(y, z):
     quadrilateral so it can be plotted in the mesh
     '''
 
-    for i in xrange(y.shape[0]):
+    for i in range(y.shape[0]):
         total_mask = y[i].mask | z[i].mask
         depths = y[i][~total_mask]
         values = z[i][~total_mask]
@@ -227,13 +227,13 @@ def main(args):
             else:
                 if args.deployment:
                     continue
-            print deployment['deployment_dir']
+            print(deployment['deployment_dir'])
             path = os.path.join(args.path, deployment['deployment_dir'])
             if not os.path.exists(path):
                 os.makedirs(path)
             plot_deployment(deployment, path)
         except Exception:
-            print "Error processing"
+            print("Error processing")
             from traceback import print_exc
             print_exc()
 

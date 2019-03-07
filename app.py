@@ -5,12 +5,12 @@ app
 The application context
 '''
 from flask import Flask, url_for, jsonify
-from flask_environments import Environments
+from util.flask_environments import Environments
 from celery import Celery
 import os
 
 celery = Celery('__main__')
-print hex(id(celery))
+print(hex(id(celery)))
 
 
 app = Flask(__name__, static_folder='web/static')
