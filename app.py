@@ -5,17 +5,16 @@ app
 The application context
 '''
 from flask import Flask, url_for, jsonify
-from flask_environments import Environments
+from dynaconf import FlaskDynaconf
 from celery import Celery
 import os
 
 celery = Celery('__main__')
-print hex(id(celery))
+print(hex(id(celery)))
 
 
 app = Flask(__name__, static_folder='web/static')
-env = Environments(app, default_env='DEVELOPMENT')
-env.from_yaml('config.yml')
+FlaskDynaconf(app)
 
 celery.conf.update(BROKER_URL=app.config['REDIS_URL'],
             CELERY_RESULT_BACKEND=app.config['REDIS_URL'])
@@ -44,7 +43,6 @@ if app.config['LOGGING'] == True:
     file_handler.setFormatter(formatter)
     stream_handler.setFormatter(formatter)
     app.logger.addHandler(file_handler)
-    #app.logger.addHandler(stream_handler)
     app.logger.setLevel(logging.DEBUG)
     app.logger.info('Application Process Started')
 
@@ -93,4 +91,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

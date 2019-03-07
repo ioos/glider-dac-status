@@ -6,6 +6,7 @@ web/npm_components/
 web/node_modules/
 web/static/app/
 web/static/lib/
+web/package-lock.json
 patch
 navo/configs/*.yml
 config.local.yml

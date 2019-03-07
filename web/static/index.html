@@ -233,7 +233,6 @@
 
 <script type="text/javascript">
 $(function() {
-  console.log("Fetching templates");
   var templates = {};
   var templateResources = [
     'static/js/partials/DeploymentsTable.html',
@@ -245,12 +244,10 @@ $(function() {
       var tokens = resource.split('/');
       var resourceName = tokens[tokens.length-1];
       templates[resourceName] = template;
-      console.log("Loaded", resourceName);
     });
   });
 
   $.when.apply($, fetches).done(function() {
-    console.log("initializing DAC Status");
     var dacStatus = new DacStatus(templates);
     dacStatus.load();
   });
