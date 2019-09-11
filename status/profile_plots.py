@@ -5,9 +5,8 @@ import matplotlib
 matplotlib.use('AGG')
 
 from netCDF4 import Dataset
-from netcdftime.netcdftime import utime
+from netcdftime import utime
 from functools import wraps
-from scipy import interpolate
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
@@ -16,35 +15,25 @@ import os
 import requests
 import sys
 import cmocean
+import matplotlib.cm as cm
 import time
-
-
-def time_function(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        t0 = time.time()
-        retval = f(*args, **kwargs)
-        t1 = time.time()
-        print '{} took {} s'.format(f.__name__, t1-t0)
-        return retval
-    return wrapper
 
 
 PARAMETERS = {
     'temperature': {
-        'cmap': cmocean.cm.temp,
+        'cmap': cmocean.cm.thermal,
         'display': u'Temperature (°C)'
     },
     'salinity': {
-        'cmap': cmocean.cm.salinity,
+        'cmap': cmocean.cm.haline,
         'display': u'Salinity (1e-3)'
     },
     'conductivity': {
-        'cmap': cmocean.cm.salinity,
+        'cmap': cmocean.cm.haline,
         'display': u'Conductivity (S m-1)'
     },
     'density': {
-        'cmap': cmocean.cm.density,
+        'cmap': cmocean.cm.dense,
         'display': u'Density (kg m-3)',
     }
 }
@@ -61,7 +50,7 @@ def get_times(nc, x, z):
     '''
     xv = np.ones(z.shape, dtype=np.object)
     converter = utime(nc.variables['time'].units)
-    for i, timestamp in enumerate(x):
+    for i, timestamp in enumerate(np.squeeze(x)):
         xv[i, :] = converter.num2date(timestamp)
 
     xv = mdates.date2num(xv)
@@ -87,7 +76,7 @@ def generate_profile_plot(x, y, z, cmap, title='Glider Profiles', ylabel='Pressu
     vmax = mean + 2 * std
     if vmin < 0:
         vmin = 0
-    im = ax.pcolormesh(x, y, z, cmap=cmap, vmin=vmin, vmax=vmax)
+    im = ax.scatter(x, y, c=z, cmap=cmap, vmin=vmin, vmax=vmax)
     ax.set_title(title)
     ax.invert_yaxis()
     date_format = mdates.DateFormatter('%Y-%m-%d')
@@ -123,9 +112,8 @@ def plot_from_nc(title, nc, parameter, filepath):
     y.mask = total_mask
     z.mask = total_mask
 
-    fix_profiles(y, z)
-    stretch_and_fill(y, z)
-
+    z = np.squeeze(z)
+    y = np.squeeze(y)
     x = get_times(nc, x, z)
 
     title = title + ' ' + parameter[0].upper() + parameter[1:] + ' Profiles'
@@ -147,8 +135,9 @@ def iter_deployments():
     Iterates over all of the GliderDAC deployments and returns the dictionary
     containing the deployment attributes.
     '''
-    url = 'http://data.ioos.us/gliders/providers/api/deployment'
-    response = requests.get(url)
+    url = 'https://gliders.ioos.us/providers/api/deployment'
+    response = requests.get(url, timeout=20)
+    response.raise_for_status()
     results = response.json()
     for deployment in results['results']:
         yield deployment
@@ -164,55 +153,24 @@ def plot_deployment(deployment, path):
     thredds_url = deployment['dap']
     with Dataset(thredds_url, 'r') as nc:
         for parameter in PARAMETERS:
-                filename = os.path.join(path, '%s.png' % parameter)
-                try:
-                    plot_from_nc(deployment['name'], nc, parameter, filename)
-                except Exception as e:
-                    print "Failed to generate plot for %s" % parameter
-                    continue
-                print filename
+            filename = os.path.join(path, '%s.png' % parameter)
+            try:
+                plot_from_nc(deployment['name'], nc, parameter, filename)
+            except Exception:
+                print("Failed to generate plot for %s" % parameter)
+                continue
+            print(filename)
 
 
 def fix_profiles(y, z):
     '''
     Inverts the profile in-place if it is an upcast, so the mesh has a correct y-axis
     '''
-    for i in xrange(y.shape[0]):
+    for i in range(y.shape[0]):
         # if profile is flipped
         if len(y[i][~y[i].mask]) and y[i][~y[i].mask][0] > y[i][~y[i].mask][-1]:
             y[i][~y[i].mask] = y[i][~y[i].mask][::-1]
             z[i][~z[i].mask] = z[i][~z[i].mask][::-1]
-
-
-def stretch_and_fill(y, z):
-    '''
-    Fills missing and corrupt data with interpolated values to fill the
-    quadrilateral so it can be plotted in the mesh
-    '''
-
-    for i in xrange(y.shape[0]):
-        total_mask = y[i].mask | z[i].mask
-        depths = y[i][~total_mask]
-        values = z[i][~total_mask]
-
-        depth_mask = (depths < 0)
-
-        depths = depths[~depth_mask]
-        values = values[~depth_mask]
-
-        depths, index = np.unique(depths, return_index=True)
-        values = values[index]
-
-        if depths.shape[0] < 2:
-            y[i].mask = np.ones(y.shape[1], dtype='bool')
-            z[i].mask = np.ones(z.shape[1], dtype='bool')
-            continue
-
-        f_y = interpolate.interp1d(np.linspace(0, 1, depths.shape[0]), depths)
-        f_z = interpolate.interp1d(depths, values)
-
-        y[i] = f_y(np.linspace(0, 1, y.shape[1]))
-        z[i] = f_z(y[i].compressed())
 
 
 def main(args):
@@ -227,13 +185,13 @@ def main(args):
             else:
                 if args.deployment:
                     continue
-            print deployment['deployment_dir']
+            print(deployment['deployment_dir'])
             path = os.path.join(args.path, deployment['deployment_dir'])
             if not os.path.exists(path):
                 os.makedirs(path)
             plot_deployment(deployment, path)
         except Exception:
-            print "Error processing"
+            print("Error processing")
             from traceback import print_exc
             print_exc()
 
