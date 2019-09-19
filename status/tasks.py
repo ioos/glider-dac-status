@@ -46,16 +46,18 @@ def get_trajectory(erddap_url):
     Reads the trajectory information from ERDDAP and returns a GEOJSON like
     structure.
     '''
-    # http://data.ioos.us/gliders/erddap/tabledap/ru01-20140104T1621.json?latitude,longitude&trajectory=%22ru01-20140104T1621%22
+    # https://gliders.ioos.us/erddap/tabledap/ru01-20140104T1621.json?latitude,longitude&time&orderBy(%22time%22)
     url = erddap_url.replace('html', 'json')
-    url += '?longitude,latitude'
+    # ERDDAP requires the variable being sorted to be present in the variable
+    # list.  The time variable will be removed before converting to GeoJSON
+    url += '?longitude,latitude,time&orderBy(%22time%22)'
     response = requests.get(url)
     if response.status_code != 200:
         raise IOError("Failed to get trajectories")
     data = response.json()
     geo_data = {
         'type': 'LineString',
-        'coordinates': data['table']['rows']
+        'coordinates': [c[0:2] for c in data['table']['rows']]
     }
     return geo_data
 
