@@ -28,7 +28,7 @@ node_modules/bower/bin/bower install
 
 # Run app:
 ```
-python app.py
+ENV_FOR_DYNACONF=production SETTINGS_FILE_FOR_DYNACONF='/path/to/config.yml python app.py
 ```
 from the root directory(Not from web dir)
 
