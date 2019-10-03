@@ -19,7 +19,7 @@ def get_trajectory_features():
 
 @manager.command
 def list_routes():
-    import urllib
+    import urllib.request, urllib.parse, urllib.error
     output = []
     for rule in app.url_map.iter_rules():
 
@@ -29,11 +29,11 @@ def list_routes():
 
         methods = ','.join(rule.methods)
         url = url_for(rule.endpoint, **options)
-        line = urllib.unquote("{:50s} {:20s} {}".format(rule.endpoint, methods, url))
+        line = urllib.parse.unquote("{:50s} {:20s} {}".format(rule.endpoint, methods, url))
         output.append(line)
 
     for line in sorted(output):
-        print line
+        print(line)
 
 if __name__ == '__main__':
     manager.run()

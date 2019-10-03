@@ -1,4 +1,4 @@
-COMMON: &common
+DEFAULT: &common
   LOGGING: True
   LOG_DIRECTORY: logs
   LOG_FILE: 'status.log'

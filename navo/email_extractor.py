@@ -25,21 +25,21 @@ class GliderEmailProcessor(object):
             rv, data = self.mail_client.search(None, "ALL")
 
         if rv != 'OK':
-            print "No messages found!"
+            print("No messages found!")
             return
 
         for num in data[0].split():
             rv, data = self.mail_client.fetch(num, '(RFC822)')
             if rv != 'OK':
-                print "ERROR getting message", num
+                print("ERROR getting message", num)
                 return
             
             msg = email.message_from_string(data[0][1])
             decode = email.header.decode_header(msg['Subject'])[0]
-            subject = unicode(decode[0])
-            print 'Message {}: {}'.format(num, subject)
-            print 'Raw Date:', msg['Date']
-            print "Writing message ", num
+            subject = str(decode[0])
+            print('Message {}: {}'.format(num, subject))
+            print('Raw Date:', msg['Date'])
+            print("Writing message ", num)
             if not os.path.exists(self.config['OUTPUT_DIRECTORY']):
                 os.makedirs(self.config['OUTPUT_DIRECTORY'])
             with open(os.path.join(self.config['OUTPUT_DIRECTORY'], '{}.txt'.format(num)), 'wb') as f:
@@ -50,8 +50,8 @@ class GliderEmailProcessor(object):
             if date_tuple:
                 local_date = datetime.datetime.fromtimestamp(
                     email.utils.mktime_tz(date_tuple))
-                print "Local Date:", \
-                    local_date.strftime("%a, %d %b %Y %H:%M:%S")
+                print("Local Date:", \
+                    local_date.strftime("%a, %d %b %Y %H:%M:%S"))
 
     def process(self):
         # open connection to gmail 
@@ -63,14 +63,14 @@ class GliderEmailProcessor(object):
         status, data = self.mail_client.login(self.config['EMAIL_ACCOUNT'], self.config['EMAIL_PASSWORD'])
 
          
-        print status, data
+        print(status, data)
          
          # M.list() returns a list of all the mailboxes
         status, mailboxes = self.mail_client.list()
         if status == 'OK':
-            print "Mailboxes:"
+            print("Mailboxes:")
             for mailbox in mailboxes:
-                print mailbox
+                print(mailbox)
          
         mailbox_list = []
 
@@ -79,11 +79,11 @@ class GliderEmailProcessor(object):
         ## The function will return the subject and date of each email, and write to a local .txt file
         status, emails = self.mail_client.select(self.config['EMAIL_FOLDER'])
         if status == 'OK':
-            print "Processing mailbox...\n"
+            print("Processing mailbox...\n")
             self.process_mailbox()     
             self.mail_client.close()
         else:
-            print "ERROR: Unable to open mailbox ", status
+            print("ERROR: Unable to open mailbox ", status)
          
         self.mail_client.logout()
 
