@@ -32,8 +32,5 @@ def list_routes():
         line = urllib.parse.unquote("{:50s} {:20s} {}".format(rule.endpoint, methods, url))
         output.append(line)
 
-    for line in sorted(output):
-        print(line)
-
 if __name__ == '__main__':
     manager.run()

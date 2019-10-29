@@ -9,8 +9,8 @@ from dynaconf import FlaskDynaconf
 from celery import Celery
 import os
 
+
 celery = Celery('__main__')
-print(hex(id(celery)))
 
 
 app = Flask(__name__, static_folder='web/static')
@@ -86,7 +86,8 @@ def main():
     '''
     Runs the application
     '''
-    app.run(host=app.config['HOST'], port=app.config['PORT'], debug=app.config['DEBUG'])
+    app.run(host=app.config['HOST'], port=app.config['PORT'],
+            debug=app.config['DEBUG'])
     return 0
 
 if __name__ == '__main__':
