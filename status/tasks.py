@@ -34,7 +34,7 @@ def write_json(data):
         logger.error('JSON FILE IS NONE')
         return False
 
-    with open(json_file, 'wb') as f:
+    with open(json_file, 'w') as f:
         f.write(json.dumps(data))
 
     logger.info('Updated %s', json_file)
