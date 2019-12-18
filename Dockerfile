@@ -30,8 +30,6 @@ RUN apt-get update && \
 
 ENV FLASK_ENV="PRODUCTION"
 COPY --from=buildstep /web/ /glider-dac-status/web
-RUN chown glider -R /glider-dac-status/
+RUN chown -R glider:glider /glider-dac-status/
 USER glider
-
 EXPOSE 5000
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "app:app"]

@@ -8,7 +8,7 @@ DEFAULT: &common
   DEBUG: True
   #SERVER_NAME: localhost
   JSONIFY_PRETTYPRINT_REGULAR: true
-  REDIS_URL: 'redis://localhost:6379'
+  REDIS_URL: 'redis://redis:6379'
   STATUS_JSON: 'web/static/json/status.json'
   TRAJECTORY_DIR: 'web/static/json/trajectories/'
   ERDDAP_URL: 'https://gliders.ioos.us/erddap/tabledap/allDatasets.json'
