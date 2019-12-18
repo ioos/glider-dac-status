@@ -11,9 +11,9 @@ DEFAULT: &common
   REDIS_URL: 'redis://localhost:6379'
   STATUS_JSON: 'web/static/json/status.json'
   TRAJECTORY_DIR: 'web/static/json/trajectories/'
-  ERDDAP_URL: 'http://data.ioos.us/gliders/erddap/tabledap/allDatasets.json'
-  DAC_API: 'http://data.ioos.us/gliders/providers/api/deployment'
-  FILE_DIR: '/data/data_dir/'
+  ERDDAP_URL: 'https://gliders.ioos.us/erddap/tabledap/allDatasets.json'
+  DAC_API: 'https://gliders.ioos.us/providers/api/deployment'
+  FILE_DIR: '/data/data/priv_erddap/'
   GLIDER_EMAIL:
     EMAIL_ACCOUNT: "xxxxxxxxxxxxxxxxxxxxxxxxx"
     EMAIL_PASSWORD: "xxxxxxxxxxxxxxxxxxxxxxxxx"

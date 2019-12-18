@@ -16,6 +16,9 @@ celery = Celery('__main__')
 app = Flask(__name__, static_folder='web/static')
 env = Environments(app, default_env='DEVELOPMENT')
 env.from_yaml('config.yml')
+# Override config file with local version
+if os.path.exists('config.local.yml'):
+    env.from_yaml('config.local.yml')
 
 celery.conf.update(BROKER_URL=app.config['REDIS_URL'],
                    CELERY_RESULT_BACKEND=app.config['REDIS_URL'])
