@@ -5,8 +5,8 @@ app
 The application context
 '''
 from flask import Flask, url_for, jsonify
-from dynaconf import FlaskDynaconf
 from celery import Celery
+from flask_environments import Environments
 import os
 
 
@@ -14,19 +14,26 @@ celery = Celery('__main__')
 
 
 app = Flask(__name__, static_folder='web/static')
-FlaskDynaconf(app)
+env = Environments(app, default_env='DEVELOPMENT')
+env.from_yaml('config.yml')
 
 celery.conf.update(BROKER_URL=app.config['REDIS_URL'],
-            CELERY_RESULT_BACKEND=app.config['REDIS_URL'])
+                   CELERY_RESULT_BACKEND=app.config['REDIS_URL'])
 TaskBase = celery.Task
+
+
 class ContextTask(TaskBase):
     abstract = True
+
     def __call__(self, *args, **kwargs):
         with app.app_context():
             return TaskBase.__call__(self, *args, **kwargs)
+
+
 celery.Task = ContextTask
 
-if app.config['LOGGING'] == True:
+
+if app.config['LOGGING'] is True:
     import logging
     logger = logging.getLogger('replicate')
     logger.setLevel(logging.DEBUG)
@@ -46,6 +53,7 @@ if app.config['LOGGING'] == True:
     app.logger.setLevel(logging.DEBUG)
     app.logger.info('Application Process Started')
 
+
 def has_no_empty_params(rule):
     '''
     Something to do with empty params?
@@ -54,7 +62,7 @@ def has_no_empty_params(rule):
     arguments = rule.arguments if rule.arguments is not None else ()
     return len(defaults) >= len(arguments)
 
-#route("/site-map")
+
 def site_map():
     '''
     Returns a json structure for the site routes and handlers
@@ -69,6 +77,7 @@ def site_map():
     # links is now a list of url, endpoint tuples
     return jsonify(rules=links)
 
+
 # handle proxy server headers
 from status.reverse_proxy import ReverseProxied
 app.wsgi_app = ReverseProxied(app.wsgi_app)
@@ -82,6 +91,7 @@ app.register_blueprint(web_blueprint)
 if app.config['DEBUG']:
     app.add_url_rule('/site-map', 'site_map', site_map)
 
+
 def main():
     '''
     Runs the application
@@ -89,6 +99,7 @@ def main():
     app.run(host=app.config['HOST'], port=app.config['PORT'],
             debug=app.config['DEBUG'])
     return 0
+
 
 if __name__ == '__main__':
     main()

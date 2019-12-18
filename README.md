@@ -16,19 +16,16 @@ pip install -r requirements/dev.txt
 cd web
 ```
 
-## NPM
+## Yarn
 ```
-npm install
-```
-
-## Bower install:
-```
-node_modules/bower/bin/bower install
+yarn global add grunt-cli
+yarn install
+grunt
 ```
 
 # Run app:
 ```
-ENV_FOR_DYNACONF=production SETTINGS_FILE_FOR_DYNACONF='/path/to/config.yml python app.py
+python app.py
 ```
 from the root directory(Not from web dir)
 
