@@ -13,3 +13,4 @@ config.local.yml
 redis_data/
 .DS_Store
 .ipynb_checkpoints
+celerybeat-schedule

@@ -4,14 +4,14 @@ app
 
 The application context
 '''
-from flask import Flask, url_for, jsonify
 from celery import Celery
+from celery.schedules import crontab
+from flask import Flask, url_for, jsonify
 from flask_environments import Environments
 import os
 
 
 celery = Celery('__main__')
-
 
 app = Flask(__name__, static_folder='web/static')
 env = Environments(app, default_env='DEVELOPMENT')
@@ -20,8 +20,9 @@ env.from_yaml('config.yml')
 if os.path.exists('config.local.yml'):
     env.from_yaml('config.local.yml')
 
-celery.conf.update(BROKER_URL=app.config['REDIS_URL'],
-                   CELERY_RESULT_BACKEND=app.config['REDIS_URL'])
+celery.conf.update(broker_url=app.config['REDIS_URL'],
+                   result_backend=app.config['REDIS_URL'])
+
 TaskBase = celery.Task
 
 
@@ -35,6 +36,13 @@ class ContextTask(TaskBase):
 
 celery.Task = ContextTask
 
+# Set up a periodic task
+celery.conf.beat_schedule = {
+    "get_dac_status_task": {
+        "task": "status.tasks.get_dac_status",
+        "schedule": crontab(minute="*/15")
+    }
+}
 
 if app.config['LOGGING'] is True:
     import logging
