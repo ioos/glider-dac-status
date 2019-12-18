@@ -27,9 +27,17 @@ grunt
 ```
 python app.py
 ```
-from the root directory(Not from web dir)
+from the root directory
 
 # Open app in browser:
 ```
 http://localhost:4000
+```
+
+# Deploy
+## Using docker-compose
+
+Check out the docker-compose.yml file located at the root of this project
+```
+docker-compose up -d
 ```
