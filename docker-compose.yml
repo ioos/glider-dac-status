@@ -6,8 +6,8 @@ services:
     build: .
     ports:
       - 8000:5000
-    # volumes:
-    #   - .:/glider-dac-status
+    volumes:
+      - ./config.local.yml:/glider-dac-status/config.local.yml
     depends_on:
       - redis
     command: gunicorn -w 4 -b "0.0.0.0:5000" app:app
