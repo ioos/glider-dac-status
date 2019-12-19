@@ -10,3 +10,7 @@ web/package-lock.json
 patch
 navo/configs/*.yml
 config.local.yml
+redis_data/
+.DS_Store
+.ipynb_checkpoints
+celerybeat-schedule

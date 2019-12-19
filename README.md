@@ -16,23 +16,28 @@ pip install -r requirements/dev.txt
 cd web
 ```
 
-## NPM
+## Yarn
 ```
-npm install
-```
-
-## Bower install:
-```
-node_modules/bower/bin/bower install
+yarn global add grunt-cli
+yarn install
+grunt
 ```
 
 # Run app:
 ```
-ENV_FOR_DYNACONF=production SETTINGS_FILE_FOR_DYNACONF='/path/to/config.yml python app.py
+python app.py
 ```
-from the root directory(Not from web dir)
+from the root directory
 
 # Open app in browser:
 ```
 http://localhost:4000
+```
+
+# Deploy
+## Using docker-compose
+
+Check out the docker-compose.yml file located at the root of this project
+```
+docker-compose up -d
 ```

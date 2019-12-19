@@ -104,8 +104,8 @@ def get_dac_status():
     dac_api_url = app.config.get('DAC_API')
     erddap_url = app.config.get('ERDDAP_URL')
     file_dir = app.config.get('FILE_DIR')
-    deployment_url_template = 'http://data.ioos.us/gliders/providers/deployment/{:s}'
-    tds_url_template = 'http://data.ioos.us/gliders/thredds/dodsC/deployments/{:s}/{:s}/catalog.html?dataset=deployments/{:s}/{:s}/{:s}.nc3.nc'
+    deployment_url_template = 'https://gliders.ioos.us/providers/deployment/{:s}'
+    tds_url_template = 'https://gliders.ioos.us/thredds/dodsC/deployments/{:s}/{:s}/catalog.html?dataset=deployments/{:s}/{:s}/{:s}.nc3.nc'
     deployments = {
         'meta': {
             'fetch_time': time.strftime('%b %d, %Y %H:%M Z', time.gmtime())

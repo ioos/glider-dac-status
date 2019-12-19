@@ -1,6 +1,5 @@
 Flask==1.1.1
 Flask-RESTful==0.3.1
-dynaconf>=2.1.1
 Jinja2>=2.10.1
 MarkupSafe==0.23
 PyYAML==5.1
@@ -9,8 +8,8 @@ aniso8601==0.92
 argparse==1.2.1
 itsdangerous==0.24
 pytz==2014.10
-celery==3.1.17
-redis==2.10.3
+celery==4.4.0
+redis>=3.2.0
 requests==2.22.0
 Flask-Script==2.0.5
 matplotlib>=2.2.4
