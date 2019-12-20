@@ -36,12 +36,16 @@ class ContextTask(TaskBase):
 
 celery.Task = ContextTask
 
-# Set up a periodic task
+# Set up periodic tasks
 celery.conf.beat_schedule = {
     "get_dac_status_task": {
         "task": "status.tasks.get_dac_status",
-        "schedule": crontab(minute="*/15")
-    }
+        "schedule": crontab(minute="*/15")  # Run every 15 mins
+    },
+    "get_dac_profile_plots_task": {
+        "task": "status.tasks.get_dac_profile_plots",
+        "schedule": crontab(minute=0, hour=12)  # Run once a day
+    },
 }
 
 if app.config['LOGGING'] is True:

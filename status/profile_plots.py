@@ -150,7 +150,7 @@ def plot_deployment(deployment, path):
     :param dict deployment: A deployment object
     :param str path: Folder path to where to store the images
     '''
-    thredds_url = deployment['dap']
+    thredds_url = deployment['dap'] + '#fillmismatch'
     with Dataset(thredds_url, 'r') as nc:
         for parameter in PARAMETERS:
             filename = os.path.join(path, '%s.png' % parameter)
@@ -173,20 +173,20 @@ def fix_profiles(y, z):
             z[i][~z[i].mask] = z[i][~z[i].mask][::-1]
 
 
-def main(args):
+def get_profile_plots(out_path, deployments=None):
     '''
     Builds a directory of profile plots from the GliderDAC deployments
     '''
     for deployment in iter_deployments():
         try:
-            for deployment_filter in args.deployment or []:
+            for deployment_filter in deployments or []:
                 if deployment_filter in deployment['deployment_dir']:
                     break
             else:
-                if args.deployment:
+                if deployments:
                     continue
             print(deployment['deployment_dir'])
-            path = os.path.join(args.path, deployment['deployment_dir'])
+            path = os.path.join(out_path, deployment['deployment_dir'])
             if not os.path.exists(path):
                 os.makedirs(path)
             plot_deployment(deployment, path)
@@ -196,6 +196,13 @@ def main(args):
             print_exc()
 
     return 0
+
+
+def main(args):
+    '''
+    Main entry point if calling function as script
+    '''
+    get_profile_plots(args.path, args.deployment)
 
 
 if __name__ == '__main__':
