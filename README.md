@@ -34,10 +34,28 @@ from the root directory
 http://localhost:4000
 ```
 
+# Run celery workers
+```
+celery worker -A app.celery --loglevel=info
+```
+
+# Run celery beat
+
+This will kick off tasks at regular intervals.
+
+Tasks include get_dac_profile_plots and get_dac_status
+```
+celery beat -A app.celery --loglevel=info
+
+```
+
 # Deploy
 ## Using docker-compose
 
 Check out the docker-compose.yml file located at the root of this project
 ```
-docker-compose up -d
+docker-compose up --build
 ```
+
+
+
