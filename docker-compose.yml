@@ -25,6 +25,7 @@ services:
     volumes:
       - ./config.local.yml:/glider-dac-status/config.local.yml
       - /tmp/status.json:/glider-dac-status/web/static/json/status.json
+      - /tmp/web/static/profiles/:/glider-dac-status/web/static/profiles/
     depends_on:
       - redis
     command: celery worker -A app.celery --loglevel=info
