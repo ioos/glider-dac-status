@@ -52,7 +52,7 @@ def get_trajectory(erddap_url):
     # ERDDAP requires the variable being sorted to be present in the variable
     # list.  The time variable will be removed before converting to GeoJSON
     url += '?longitude,latitude,time&orderBy(%22time%22)'
-    response = requests.get(url)
+    response = requests.get(url, timeout=180)
     if response.status_code != 200:
         raise IOError("Failed to get trajectories")
     data = response.json()
@@ -84,11 +84,11 @@ def get_dac_profile_plots():
     return get_profile_plots(profile_plot_dir)
 
 
-@celery.task()
+@celery.task(time_limit=300)
 def get_trajectory_features():
     deployments_url = app.config.get('DAC_API')
 
-    response = requests.get(deployments_url)
+    response = requests.get(deployments_url, timeout=60)
     if response.status_code != 200:
         raise IOError("Failed to get response from DAC ACPI")
     data = response.json()
@@ -106,7 +106,7 @@ def get_trajectory_features():
 
 
 @celery.task()
-def get_dac_status():
+def get_dac_status(time_limit=300):
     dac_api_url = app.config.get('DAC_API')
     erddap_url = app.config.get('ERDDAP_URL')
     file_dir = app.config.get('FILE_DIR')
@@ -145,7 +145,7 @@ def get_dac_status():
         'time_coverage_end\s"(\d{4}\-\d{2}\-\d{2}T\d{2}:\d{2}:\d{2}Z)"')
     # Request the dac deployments metadata
     logger.info('Fetching DAC deployments: %s', dac_api_url)
-    dac_request = requests.get(dac_api_url)
+    dac_request = requests.get(dac_api_url, timeout=60)
     if dac_request.status_code != 200:
         logger.error('ERDDAP request failed: %s (%s)',
                      dac_api_url, dac_request.reason)
@@ -213,7 +213,7 @@ def get_dac_status():
 
             # Request the ERDDAP Data Attribute Structure (.das) document
             logger.info('Fetching das: %s', das_url)
-            das_request = requests.get(das_url)
+            das_request = requests.get(das_url, timeout=60)
             if das_request.status_code != 200:
                 logger.error('das request failed: %s (%s)',
                              das_url, das_request.reason)
@@ -255,7 +255,7 @@ def get_dac_status():
                 json_url = meta['tabledap'] + '.json'
                 data_url = '?'.join([json_url, 'wmo_id,profile_id'])
                 logger.info('Fetching data url: %s', data_url)
-                r = requests.get(data_url)
+                r = requests.get(data_url, timeout=120)
                 if r.status_code != 200:
                     logger.error('Dataset fetch error: %s', r.reason)
                     continue
