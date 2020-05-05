@@ -1,11 +1,9 @@
 import pytest
+from app import app
 from flask import jsonify, Flask
 from datetime import datetime, timezone, timedelta
 import json
 from contextlib import contextmanager
-from flask import appcontext_pushed, g
-
-app = Flask(__name__)
 
 @app.route('/api/deployments')
 def deployments_mock():
@@ -17,6 +15,10 @@ def client():
     app.config["DEBUG"] = False
     with app.test_client() as client:
         yield client
+
+def test_index(client):
+    resp = client.get("/")
+    assert resp.status == "200 OK"
 
 def test_deployments_api(client):
     with app.app_context():
