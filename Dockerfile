@@ -10,6 +10,7 @@ RUN yarn global add grunt-cli && \
     grunt
 
 FROM python:3.6
+ARG glider_gid_uid=1000
 
 RUN mkdir -p /glider-dac-status
 RUN mkdir /glider-dac-status/logs
@@ -25,7 +26,8 @@ RUN apt-get update && \
     pip install --no-cache cython gunicorn && \
     pip install --no-cache -r /requirements.txt && \
     rm -rf /var/lib/apt/lists/* && \
-    useradd glider
+    groupadd -g $glider_gid_uid glider && \
+    useradd -u $glider_gid_uid -g $glider_gid_uid glider
 
 
 ENV FLASK_ENV="PRODUCTION"
