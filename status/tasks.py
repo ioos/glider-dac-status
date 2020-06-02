@@ -5,7 +5,7 @@ status.tasks
 from app import celery, app
 from datetime import datetime
 from celery.utils.log import get_task_logger
-from status.profile_plots import get_profile_plots
+from status.profile_plots import generate_profile_plots
 from urllib.parse import urlencode
 import status.clocks as clock
 import json
@@ -79,9 +79,9 @@ def write_trajectory(deployment, geo_data):
 
 
 @celery.task()
-def get_dac_profile_plots():
+def generate_dac_profile_plots():
     profile_plot_dir = app.config.get('PROFILE_PLOT_DIR')
-    return get_profile_plots(profile_plot_dir)
+    return generate_profile_plots(profile_plot_dir)
 
 
 @celery.task(time_limit=300)

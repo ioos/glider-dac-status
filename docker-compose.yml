@@ -7,8 +7,11 @@ services:
     ports:
       - 8000:5000
     volumes:
-      - ./config.local.yml:/glider-dac-status/config.local.yml
-      - /tmp/status.json:/glider-dac-status/web/static/json/status.json
+      # For Local
+      - .:/glider-dac-status/
+      # For Dev/Prod
+      # - ./config.local.yml:/glider-dac-status/config.local.yml
+      # - /tmp/status.json:/glider-dac-status/web/static/json/status.json
     depends_on:
       - redis
     command: gunicorn -w 4 -b "0.0.0.0:5000" app:app
@@ -23,9 +26,12 @@ services:
     restart: always
     build: .
     volumes:
-      - ./config.local.yml:/glider-dac-status/config.local.yml
-      - /tmp/status.json:/glider-dac-status/web/static/json/status.json
-      - /tmp/web/static/profiles/:/glider-dac-status/web/static/profiles/
+      # For Local
+      - .:/glider-dac-status/
+      # For Dev/Prod
+      # - ./config.local.yml:/glider-dac-status/config.local.yml
+      # - /tmp/status.json:/glider-dac-status/web/static/json/status.json
+      # - /tmp/web/static/profiles/:/glider-dac-status/web/static/profiles/
     depends_on:
       - redis
     command: celery worker -A app.celery --loglevel=info
@@ -33,10 +39,11 @@ services:
   celery_beat:
     build: .
     volumes:
-      - ./config.local.yml:/glider-dac-status/config.local.yml
+      # For Local
+      - .:/glider-dac-status/
+      # For Dev/Prod
+      # - ./config.local.yml:/glider-dac-status/config.local.yml
     command: celery beat -A app.celery --loglevel=info
 
 volumes:
   redis_data:
-    external:
-      name: redis_data

@@ -20,6 +20,11 @@ DEFAULT: &common
     EMAIL_PASSWORD: "xxxxxxxxxxxxxxxxxxxxxxxxx"
     EMAIL_FOLDER: "xxxxxxxxxxxxxxxxxxxxxxxxx"
     OUTPUT_DIRECTORY: 'navo/cache'
+  AWS:
+    SQS_QUEUE_URL: "xxxxxxxxxxxxxxxxxxxxxxxxx"
+    ACCESS_KEY_ID: "xxxxxxxxxxxxxxxxxxxxxxxxx"
+    SECRET_ACCESS_KEY: "xxxxxxxxxxxxxxxxxxxxxxxxx"
+    REGION_NAME: "xxxxxxxxxxxxxxxxxxxxxxxxx"
 
 DEVELOPMENT: &development
   <<: *common
