@@ -11,8 +11,7 @@ RUN yarn global add grunt-cli && \
 
 FROM python:3.6
 
-RUN mkdir -p /glider-dac-status
-RUN mkdir /glider-dac-status/logs
+RUN mkdir -p /glider-dac-status/logs
 COPY app.py config.yml flask_environments.py manage.py /glider-dac-status/
 COPY status /glider-dac-status/status
 COPY navo /glider-dac-status/navo
@@ -27,7 +26,8 @@ RUN apt-get update && \
     apt-get install -y python3-netcdf4 && \
     pip install --no-cache cython gunicorn && \
     pip install --no-cache -r /requirements.txt && \
-    pip install --no-cache -r /test_requirements.txt
+    pip install --no-cache -r /test_requirements.txt && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY --from=buildstep /web/ /glider-dac-status/web
 	
