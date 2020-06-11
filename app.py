@@ -43,8 +43,8 @@ celery.conf.beat_schedule = {
         "schedule": crontab(minute="*/15")  # Run every 15 mins
     },
     "get_dac_profile_plots_task": {
-        "task": "status.tasks.get_dac_profile_plots",
-        "schedule": crontab(minute=0, hour=12)  # Run once a day
+        "task": "status.tasks.generate_dac_profile_plots",
+        "schedule": crontab(minute=0, hour=[0, 12])  # Run twice a day
     },
 }
 
