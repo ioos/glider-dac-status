@@ -1,0 +1,20 @@
+os: linux
+dist: xenial
+language: python
+python:
+  - "3.6"
+branches:
+  only:
+  - test
+  - master
+jobs:
+  include:
+    - stage: docker
+      script: docker build . -t build
+    - stage: test
+      install: cp tests/Dockerfile ./Dockerfile
+      script: docker build . -t test      
+stages:
+  - docker
+  - test
+ 
