@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/ioos/glider-dac-status.svg?branch=master)](https://travis-ci.com/ioos/glider-dac-status)
+
 # glider-dac-status
 
 Status Application for Glider DAC
