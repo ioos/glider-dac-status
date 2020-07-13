@@ -9,10 +9,11 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import netCDF4
 import numpy as np
+import os
 import traceback
 from datetime import datetime
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 
 PARAMETERS = {
     'temperature': {
@@ -32,6 +33,7 @@ PARAMETERS = {
         'display': u'Density (kg m-3)',
     }
 }
+
 
 def generate_profile_plot(thredds_url):
     '''
@@ -69,6 +71,7 @@ def get_times(nc, x, z):
 
     xv = mdates.date2num(xv)
     return xv
+
 
 def get_plot(x, y, z, cmap, title='Glider Profiles', ylabel='Pressure (dbar)', zlabel='Temperature'):
     '''
@@ -137,7 +140,8 @@ def plot_from_nc(title, nc, parameter, filepath):
     img_data.seek(0)
 
     s3 = boto3.resource('s3')
-    bucket = s3.Bucket('ioos-glider-plots')
+    S3_BUCKET = os.environ['AWS_S3_BUCKET'] or 'ioos-glider-plots'
+    bucket = s3.Bucket(S3_BUCKET)
     bucket.put_object(Body=img_data, ContentType='image/png', Key=filepath)
 
     plt.close(fig)
