@@ -8,9 +8,13 @@ import io
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import traceback
 from datetime import datetime
 from erddapy import ERDDAP
+
+
+__version__ = '0.2.0'
 
 
 PARAMETERS = {
@@ -33,7 +37,9 @@ PARAMETERS = {
     }
 }
 
+
 def generate_profile_plot(erddap_dataset):
+
     '''
     Plot the parameters for a deployment
     :param str erddap_dataset: ERDDAP .htm of a deployment
@@ -123,7 +129,9 @@ def get_times(x):
     return xv
 
 
+
 def get_plot(x, y, z, cmap='cmap', title='Glider Profiles', ylabel='Pressure (dbar)', zlabel='Temperature'):
+
     '''
     Renders a matplotlib profile plot
     :param x: list timestamps
@@ -186,5 +194,6 @@ def plot_from_pd(title, dataset, parameter, filepath):
     img_data.seek(0)
 
     s3 = boto3.resource('s3')
-    bucket = s3.Bucket('ioos-glider-plots')
+    S3_BUCKET = os.environ['AWS_S3_BUCKET'] or 'ioos-glider-plots'
+    bucket = s3.Bucket(S3_BUCKET)
     bucket.put_object(Body=img_data, ContentType='image/png', Key=filepath)

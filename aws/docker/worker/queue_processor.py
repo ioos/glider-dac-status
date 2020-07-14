@@ -8,6 +8,7 @@ import os
 import time
 from generate_profile_plot import generate_profile_plot
 
+
 def main(SQS_URL):
     '''
     Main always running SQS queue processor
@@ -23,7 +24,7 @@ def main(SQS_URL):
             time.sleep(30)
             continue
 
-        for msg in response["Messages"]: # not much need for 'for' but leave it in case we do up MaxNumberOfMessages
+        for msg in response["Messages"]:  # not much need for 'for' but leave it in case we do up MaxNumberOfMessages
             try:
                 receipt_handle = msg['ReceiptHandle']
                 body           = msg['Body']
@@ -35,10 +36,10 @@ def main(SQS_URL):
                 except Exception:
                     logging.exception("processing error")
 
-                finally: # always delete message
+                finally:  # always delete message
                     sqs.delete_message(QueueUrl=SQS_URL, ReceiptHandle=receipt_handle)
 
-            except Exception: # per message exception
+            except Exception:  # per message exception
                 logging.exception("message handling error")
 
 
@@ -50,11 +51,11 @@ if __name__ == "__main__":
     if os.path.exists(logging_conf):
         import logging.config
         logging.config.fileConfig(logging_conf)
-    else: # default logging
+    else:  # default logging
         logging.basicConfig(level=logging.INFO)
 
     try:
         SQS_URL = os.environ['SQS_URL']
         main(SQS_URL)
-    except Exception as e: # this exception is if whole thing fails to run
+    except Exception as e:  # this exception is if whole thing fails to run
         logging.exception("failed to start")
