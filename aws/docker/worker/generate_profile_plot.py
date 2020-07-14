@@ -42,7 +42,7 @@ def generate_profile_plot(erddap_dataset):
 
     '''
     Plot the parameters for a deployment
-    :param str erddap_dataset: ERDDAP .htm of a deployment
+    :param str erddap_dataset: ERDDAP .html of a deployment
     '''
     dataset_id = erddap_dataset.split('/')[-1].split('.html')[0]
     path = dir_path(dataset_id)
