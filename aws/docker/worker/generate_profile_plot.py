@@ -185,7 +185,7 @@ def plot_from_pd(title, dataset, parameter, filepath):
     fig = get_plot(xv, y, z, c[0], title, ylabel, zlabel)
 
     fig.set_size_inches(20, 5)
-    fig.savefig(filepath, dpi=100)
+    #fig.savefig(filepath, dpi=100)
     
     plt.close(fig)
     
