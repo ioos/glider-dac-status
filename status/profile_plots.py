@@ -82,7 +82,7 @@ def generate_profile_plots(deployments=None):
             if (recent_update or recent_data):
                 # Send message to SQS queue
                 message_body = dict(
-                    thredds_url=deployment['dap']
+                    erddap_dataset=deployment['erddap']
                 )
                 sqs.send_message(
                     QueueUrl=queue_url,

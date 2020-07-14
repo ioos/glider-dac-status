@@ -36,13 +36,14 @@ PARAMETERS = {
 def generate_profile_plot(erddap_dataset):
     '''
     Plot the parameters for a deployment
-    :param str erddap_dataset: the deployment name example:'ce_311-20200708T1723'
+    :param str erddap_dataset: ERDDAP .htm of a deployment
     '''
-    path = dir_path(erddap_dataset)
-    df = get_erddap_data(erddap_dataset)
+    dataset_id = erddap_dataset.split('/')[-1].split('.html')[0]
+    path = dir_path(dataset_id)
+    df = get_erddap_data(dataset_id)
 
     for parameter in PARAMETERS:
-        title = erddap_dataset + ' ' + parameter[0].upper() + parameter[1:] + ' Profiles'
+        title = dataset_id + ' ' + parameter[0].upper() + parameter[1:] + ' Profiles'
         filename = '{}/{}.png'.format(path, parameter)
         try:
             plot_from_pd(title, df, parameter, filename)
@@ -58,8 +59,9 @@ def get_erddap_data(dataset_id):
     :param dataset_id: the deployment name example:'ce_311-20200708T1723'
     :return: pandas DataFrame with deployment variable values
     '''
+
     e = ERDDAP(
-      server='https://gliders.ioos.us/erddap',
+      server='http://gliders.ioos.us/erddap',
       protocol='tabledap',
     )
     e.response = 'csv'
