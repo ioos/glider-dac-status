@@ -1,4 +1,3 @@
-import os
 import matplotlib
 matplotlib.use('AGG')
 import matplotlib.dates as mdates
@@ -8,6 +7,7 @@ import io
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.ma as ma
 import os
 import traceback
 from datetime import datetime
@@ -15,7 +15,6 @@ from erddapy import ERDDAP
 
 
 __version__ = '0.2.0'
-
 
 PARAMETERS = {
 
@@ -39,18 +38,16 @@ PARAMETERS = {
 
 
 def generate_profile_plot(erddap_dataset):
-
     '''
     Plot the parameters for a deployment
     :param str erddap_dataset: ERDDAP endpoint
     '''
     dataset_id = erddap_dataset.split('/')[-1].split('.html')[0]
-    path = dir_path(dataset_id)
     df = get_erddap_data(dataset_id)
 
     for parameter in PARAMETERS:
         title = dataset_id + ' ' + parameter[0].upper() + parameter[1:] + ' Profiles'
-        filename = '{}/{}.png'.format(path, parameter)
+        filename = '{}/{}.png'.format(dataset_id, parameter)
         try:
             plot_from_pd(title, df, parameter, filename)
         except Exception:
@@ -65,7 +62,6 @@ def get_erddap_data(dataset_id):
     :param dataset_id: the deployment name example:'ce_311-20200708T1723'
     :return: pandas DataFrame with deployment variable values
     '''
-
     e = ERDDAP(
       server='http://gliders.ioos.us/erddap',
       protocol='tabledap',
@@ -86,55 +82,63 @@ def get_erddap_data(dataset_id):
     return df
 
 
-def dir_path(dataset_id):
-    '''
-    :param dataset_id: the deployment name example:'ce_311-20200708T1723'
-    :return: str filepath: Location to save the figure to (PNG)
-    '''
-    cwd = os.getcwd()
-    path = os.path.join(cwd,dataset_id)
-    if not os.path.exists(path):
-        os.mkdir(path)
-    return path
-
-
 def get_variables(dataset, parameter):
     '''
-    :param dataset: pandas DataFrame with deployment variable values
+    :param dataset: pandas DataFrame with deployment data
     :param parameter: name of parameter to plot
-    :return x, y, z: numpy.ndarray time, depth, values
-    :return x_name y_name z_name: string parameter name
+    :return x: list of datetime object, time
+            y, z: numpy.ndarray depth, values
+            x_name y_name z_name: string parameter name
     '''
-    
+    if 'Error' in dataset.keys()[0]:
+        print(dataset[dataset.keys()[0]][1])
+        exit()
+
+    # get the names of the columns from the dataset
     y_name = [name for name in dataset.keys() if 'depth' in name]
     x_name = [name for name in dataset.keys() if 'time' in name]
     z_name = [name for name in dataset.keys() if parameter in name]
-    
+
+    # get the data arrays
     y = dataset[y_name[0]].values
     z = dataset[z_name[0]].values
     x = dataset[x_name[0]].values
 
-    return x, y, z, x_name[0], y_name[0], z_name[0]
-
-
-def get_times(x):
-    '''
-    create a datetime object from a string
-    :param x: numpy.ndarray of date/time string values in the format '%Y-%m-%dT%H:%M:%SZ'
-    :return: list of datetime object
-    '''
+    # create list of datetime object from the numpy.ndarray of
+    # date/time string values in the format '%Y-%m-%dT%H:%M:%SZ'
+    # get the indices of non-nan timestamps
     xv = list()
-    for d in x:
-        xv.append(datetime.strptime(d,'%Y-%m-%dT%H:%M:%SZ'))
-    return xv
+    ii = list()
+    for i, d in enumerate(x):
+        try:
+            xv.append(datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ'))
+            ii.append(i)
+        except TypeError:
+            error = 'strptime() argument 1 must be str, not float'
+    #         print(error)
 
+    # select only non-nan values
+    yv = [y[n] for n in ii]
+    xv = [x[n] for n in ii]
+    zv = [z[n] for n in ii]
+
+    # convert arrays to datatime or float to mask invalid values in the next step
+    xv = np.array(xv, dtype='datetime64')
+    yv = np.array(yv, dtype='float')
+    zv = np.array(zv, dtype='float')
+
+    # mask invalid values
+    xv = ma.masked_invalid(xv)
+    yv = ma.masked_invalid(yv)
+    zv = ma.masked_invalid(zv)
+
+    return xv, yv, zv, x_name[0], y_name[0], z_name[0]
 
 
 def get_plot(x, y, z, cmap='cmap', title='Glider Profiles', ylabel='Pressure (dbar)', zlabel='Temperature'):
-
     '''
     Renders a matplotlib profile plot
-    :param x: list timestamps
+    :param x: list datetime object
     :param y: numpy.ndarray  depths
     :param z: numpy.ndarray  values
     :param cmap: The colormap to use on the plot
@@ -144,26 +148,36 @@ def get_plot(x, y, z, cmap='cmap', title='Glider Profiles', ylabel='Pressure (db
     :return fig: figure handle
     '''
 
+    # print(title)
     fig, ax = plt.subplots()
-    std = np.nanstd(z)
-    mean = np.nanmean(z)
-    vmin = mean - 2 * std
-    vmax = mean + 2 * std    
-    
-    if vmin < 0:
-        vmin = 0
-
-    im = ax.scatter(x, y, c=z, cmap=cmap, vmin=vmin, vmax=vmax)
-
     ax.set_title(title)
-    ax.invert_yaxis()
-    ax.set_xlim([min(x), max(x)])
 
+    # check z for all nan values
+    if len(z[np.logical_not(np.isnan(z))]) == 0:
+        print(zlabel.split('/')[0], ' are all nan')
+        ax.set_ylim(0,10)
+        # annotate the plot to report data issue
+        ax.annotate(zlabel.split('/')[0]+ ' are all nan', xy=(x[150], 5),
+                        xytext=(x[100], 6),
+                        )
+    else:
+        zz = z[np.logical_not(np.isnan(z))]
+        std = np.nanstd(zz)
+        mean = np.nanmean(zz)
+        vmin = mean - 2 * std
+        vmax = mean + 2 * std
+        if vmin < 0:
+            vmin = 0
+
+        im = ax.scatter(x, y, c=z, cmap=cmap, vmin=vmin, vmax=vmax)
+        colorbar = fig.colorbar(im, ax=ax)
+        colorbar.set_label(zlabel)
+
+    ax.set_xlim(min(x), max(x))
+    ax.invert_yaxis()
     date_format = mdates.DateFormatter('%Y-%m-%d')
     ax.xaxis.set_major_formatter(date_format)
     ax.set_ylabel(ylabel)
-    colorbar = fig.colorbar(im, ax=ax)
-    colorbar.set_label(zlabel)
     fig.autofmt_xdate()
 
     return fig
@@ -179,16 +193,12 @@ def plot_from_pd(title, dataset, parameter, filepath):
     '''
     x, y, z, xlabel, ylabel, zlabel = get_variables(dataset, parameter)
 
-    xv = get_times(x) # if time is of size 1 it wont work
     c = [PARAMETERS[key]['cmap'] for key in PARAMETERS.keys() if key == parameter]
     
-    fig = get_plot(xv, y, z, c[0], title, ylabel, zlabel)
+    fig = get_plot(x, y, z, c[0], title, ylabel, zlabel)
 
     fig.set_size_inches(20, 5)
-    #fig.savefig(filepath, dpi=100)
-    
-    plt.close(fig)
-    
+
     img_data = io.BytesIO()
     plt.savefig(img_data, format='png')
     img_data.seek(0)
@@ -197,3 +207,5 @@ def plot_from_pd(title, dataset, parameter, filepath):
     S3_BUCKET = os.environ['AWS_S3_BUCKET'] or 'ioos-glider-plots'
     bucket = s3.Bucket(S3_BUCKET)
     bucket.put_object(Body=img_data, ContentType='image/png', Key=filepath)
+
+    plt.close(fig)
