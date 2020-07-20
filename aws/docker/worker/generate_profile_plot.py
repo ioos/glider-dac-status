@@ -14,7 +14,7 @@ from datetime import datetime
 from erddapy import ERDDAP
 
 
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 
 PARAMETERS = {
 
@@ -51,7 +51,7 @@ def generate_profile_plot(erddap_dataset):
         try:
             plot_from_pd(title, df, parameter, filename)
         except Exception:
-            logging.exception("Failed to generate plot for {}".format(parameter))
+            logging.exception("Failed to generate plot for {}, dataset = {}".format(parameter, dataset_id))
             traceback.print_exc()
             continue
     return 0
@@ -63,21 +63,21 @@ def get_erddap_data(dataset_id):
     :return: pandas DataFrame with deployment variable values
     '''
     e = ERDDAP(
-      server='http://gliders.ioos.us/erddap',
-      protocol='tabledap',
+        server='https://gliders.ioos.us/erddap',
+        protocol='tabledap',
     )
     e.response = 'csv'
     e.dataset_id = dataset_id
     e.variables = [
-                    'depth',
-                    'latitude',
-                    'longitude',
-                    'salinity',
-                    'temperature',
-                    'conductivity',
-                    'density',
-                    'time',
-                   ]
+        'depth',
+        'latitude',
+        'longitude',
+        'salinity',
+        'temperature',
+        'conductivity',
+        'density',
+        'time',
+    ]
     df = e.to_pandas()
     return df
 
@@ -154,12 +154,13 @@ def get_plot(x, y, z, cmap='cmap', title='Glider Profiles', ylabel='Pressure (db
 
     # check z for all nan values
     if len(z[np.logical_not(np.isnan(z))]) == 0:
-        print(zlabel.split('/')[0], ' are all nan')
-        ax.set_ylim(0,10)
+        ax.set_ylim(0, 10)
         # annotate the plot to report data issue
-        ax.annotate(zlabel.split('/')[0]+ ' are all nan', xy=(x[150], 5),
-                        xytext=(x[100], 6),
-                        )
+        ax.annotate(
+            zlabel.split('/')[0] + ' are all nan',
+            xy=(x[150], 5),
+            xytext=(x[100], 6),
+        )
     else:
         zz = z[np.logical_not(np.isnan(z))]
         std = np.nanstd(zz)
@@ -187,14 +188,14 @@ def plot_from_pd(title, dataset, parameter, filepath):
     '''
     Plot the parameter from an ERDDAP .csv file put into a pandas DataFrame.
     :param str title: Title of the plot
-    :param array Dataset: A pandas array values 
+    :param array Dataset: A pandas array values
     :param str parameter: Parameter to plot
     :param str filepath: Location to save the figure to (PNG)
     '''
     x, y, z, xlabel, ylabel, zlabel = get_variables(dataset, parameter)
 
     c = [PARAMETERS[key]['cmap'] for key in PARAMETERS.keys() if key == parameter]
-    
+
     fig = get_plot(x, y, z, c[0], title, ylabel, zlabel)
 
     fig.set_size_inches(20, 5)
