@@ -30,9 +30,9 @@ def main(SQS_URL):
                 body           = msg['Body']
                 try:
                     obj = json.loads(body)     # load as object
-                    thredds_url = obj['thredds_url']
-                    logging.info("Plotting from {}".format(thredds_url))
-                    generate_profile_plot(thredds_url)
+                    erddap_dataset = obj['erddap_dataset']
+                    logging.info("Plotting from {}".format(erddap_dataset))
+                    generate_profile_plot(erddap_dataset)
                 except Exception:
                     logging.exception("processing error")
 

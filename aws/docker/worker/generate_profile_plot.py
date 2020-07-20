@@ -1,28 +1,30 @@
 import matplotlib
 matplotlib.use('AGG')
+import matplotlib.dates as mdates
 import boto3
 import cmocean
 import io
 import logging
-import matplotlib.cm as cm
-import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-import netCDF4
 import numpy as np
+import numpy.ma as ma
 import os
 import traceback
 from datetime import datetime
+from erddapy import ERDDAP
+
 
 __version__ = '0.2.0'
 
 PARAMETERS = {
+
+    'salinity': {
+        'cmap': cmocean.cm.haline,
+        'display': u'Salinity'
+    },
     'temperature': {
         'cmap': cmocean.cm.thermal,
         'display': u'Temperature (°C)'
-    },
-    'salinity': {
-        'cmap': cmocean.cm.haline,
-        'display': u'Salinity (1e-3)'
     },
     'conductivity': {
         'cmap': cmocean.cm.haline,
@@ -35,105 +37,167 @@ PARAMETERS = {
 }
 
 
-def generate_profile_plot(thredds_url):
+def generate_profile_plot(erddap_dataset):
     '''
     Plot the parameters for a deployment
-    :param str thredds_url: THREDDS DAP endpoint
+    :param str erddap_dataset: ERDDAP endpoint
     '''
-    deployment_name = thredds_url.split('/')[7]
+    dataset_id = erddap_dataset.split('/')[-1].split('.html')[0]
+    df = get_erddap_data(dataset_id)
 
-    with netCDF4.Dataset("{}#fillmismatch".format(thredds_url)) as nc:
-        for parameter in PARAMETERS:
-            filename = '{}/{}.png'.format(deployment_name, parameter)
-            try:
-                plot_from_nc(deployment_name, nc, parameter, filename)
-            except Exception:
-                logging.exception("Failed to generate plot for {}".format(parameter))
-                traceback.print_exc()
-                continue
+    for parameter in PARAMETERS:
+        title = dataset_id + ' ' + parameter[0].upper() + parameter[1:] + ' Profiles'
+        filename = '{}/{}.png'.format(dataset_id, parameter)
+        try:
+            plot_from_pd(title, df, parameter, filename)
+        except Exception:
+            logging.exception("Failed to generate plot for {}".format(parameter))
+            traceback.print_exc()
+            continue
     return 0
 
 
-def get_times(nc, x, z):
+def get_erddap_data(dataset_id):
     '''
-    Converts an array of timestamps to the matplotlib epoch and builds a
-    meshgrid of the timestamps for each profile
-    :param netCDF4.Dataset nc: An open netCDF file
-    :param numpy.ndarray x: An array of time values
-    :param numpy.ndarray z: A multi-dimensional array representing the profiles
+    :param dataset_id: the deployment name example:'ce_311-20200708T1723'
+    :return: pandas DataFrame with deployment variable values
     '''
-    xv = np.ones(z.shape, dtype=np.object)
-    # NEED TO FIX ONCE netcdftime becomes a layer
-    # converter = utime(nc.variables['time'].units)
-    for i, timestamp in enumerate(np.squeeze(x)):
-        # xv[i, :] = converter.num2date(timestamp)
-        xv[i, :] = datetime.utcfromtimestamp(timestamp)
+    e = ERDDAP(
+      server='http://gliders.ioos.us/erddap',
+      protocol='tabledap',
+    )
+    e.response = 'csv'
+    e.dataset_id = dataset_id
+    e.variables = [
+                    'depth',
+                    'latitude',
+                    'longitude',
+                    'salinity',
+                    'temperature',
+                    'conductivity',
+                    'density',
+                    'time',
+                   ]
+    df = e.to_pandas()
+    return df
 
-    xv = mdates.date2num(xv)
-    return xv
+
+def get_variables(dataset, parameter):
+    '''
+    :param dataset: pandas DataFrame with deployment data
+    :param parameter: name of parameter to plot
+    :return x: list of datetime object, time
+            y, z: numpy.ndarray depth, values
+            x_name y_name z_name: string parameter name
+    '''
+    if 'Error' in dataset.keys()[0]:
+        print(dataset[dataset.keys()[0]][1])
+        exit()
+
+    # get the names of the columns from the dataset
+    y_name = [name for name in dataset.keys() if 'depth' in name]
+    x_name = [name for name in dataset.keys() if 'time' in name]
+    z_name = [name for name in dataset.keys() if parameter in name]
+
+    # get the data arrays
+    y = dataset[y_name[0]].values
+    z = dataset[z_name[0]].values
+    x = dataset[x_name[0]].values
+
+    # create list of datetime object from the numpy.ndarray of
+    # date/time string values in the format '%Y-%m-%dT%H:%M:%SZ'
+    # get the indices of non-nan timestamps
+    xv = list()
+    ii = list()
+    for i, d in enumerate(x):
+        try:
+            xv.append(datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ'))
+            ii.append(i)
+        except TypeError:
+            error = 'strptime() argument 1 must be str, not float'
+    #         print(error)
+
+    # select only non-nan values
+    yv = [y[n] for n in ii]
+    xv = [x[n] for n in ii]
+    zv = [z[n] for n in ii]
+
+    # convert arrays to datatime or float to mask invalid values in the next step
+    xv = np.array(xv, dtype='datetime64')
+    yv = np.array(yv, dtype='float')
+    zv = np.array(zv, dtype='float')
+
+    # mask invalid values
+    xv = ma.masked_invalid(xv)
+    yv = ma.masked_invalid(yv)
+    zv = ma.masked_invalid(zv)
+
+    return xv, yv, zv, x_name[0], y_name[0], z_name[0]
 
 
-def get_plot(x, y, z, cmap, title='Glider Profiles', ylabel='Pressure (dbar)', zlabel='Temperature'):
+def get_plot(x, y, z, cmap='cmap', title='Glider Profiles', ylabel='Pressure (dbar)', zlabel='Temperature'):
     '''
     Renders a matplotlib profile plot
-    :param numpy.ndarray x: A grid of timestamps (masked arrays welcome)
-    :param numpy.ndarray y: A grid of depths     (masked arrays welcome)
-    :param numpy.ndarray z: A grid of values     (masked arrays welcome)
+    :param x: list datetime object
+    :param y: numpy.ndarray  depths
+    :param z: numpy.ndarray  values
     :param cmap: The colormap to use on the plot
     :param str title: Title of the plot
     :param str ylabel: The label to display along the Y-Axis
     :param str zlabel: The label to display along the color bar legend
+    :return fig: figure handle
     '''
+
+    # print(title)
     fig, ax = plt.subplots()
-    std = np.nanstd(z)
-    mean = np.nanmean(z)
-    vmin = mean - 2 * std
-    vmax = mean + 2 * std
-    if vmin < 0:
-        vmin = 0
-    im = ax.scatter(x, y, c=z, cmap=cmap, vmin=vmin, vmax=vmax)
     ax.set_title(title)
+
+    # check z for all nan values
+    if len(z[np.logical_not(np.isnan(z))]) == 0:
+        print(zlabel.split('/')[0], ' are all nan')
+        ax.set_ylim(0,10)
+        # annotate the plot to report data issue
+        ax.annotate(zlabel.split('/')[0]+ ' are all nan', xy=(x[150], 5),
+                        xytext=(x[100], 6),
+                        )
+    else:
+        zz = z[np.logical_not(np.isnan(z))]
+        std = np.nanstd(zz)
+        mean = np.nanmean(zz)
+        vmin = mean - 2 * std
+        vmax = mean + 2 * std
+        if vmin < 0:
+            vmin = 0
+
+        im = ax.scatter(x, y, c=z, cmap=cmap, vmin=vmin, vmax=vmax)
+        colorbar = fig.colorbar(im, ax=ax)
+        colorbar.set_label(zlabel)
+
+    ax.set_xlim(min(x), max(x))
     ax.invert_yaxis()
     date_format = mdates.DateFormatter('%Y-%m-%d')
     ax.xaxis.set_major_formatter(date_format)
     ax.set_ylabel(ylabel)
-    colorbar = fig.colorbar(im, ax=ax)
-    colorbar.set_label(zlabel)
     fig.autofmt_xdate()
 
     return fig
 
 
-def plot_from_nc(title, nc, parameter, filepath):
+def plot_from_pd(title, dataset, parameter, filepath):
     '''
-    Plot the parameter from a netCDF file. This function will take into
-    consideration deployments that have a zig-zag pattern of profiles and
-    deployments that contain non-fill NaN values.
+    Plot the parameter from an ERDDAP .csv file put into a pandas DataFrame.
     :param str title: Title of the plot
-    :param netCDF4.Dataset nc: An open netCDF file
+    :param array Dataset: A pandas array values 
     :param str parameter: Parameter to plot
     :param str filepath: Location to save the figure to (PNG)
     '''
-    x, y, z = get_variables(nc, parameter)
+    x, y, z, xlabel, ylabel, zlabel = get_variables(dataset, parameter)
 
-    # Remove empty timesteps
-    if hasattr(x, 'mask'):
-        y = y[~x.mask]
-        z = z[~x.mask]
-        x = x[~x.mask]
+    c = [PARAMETERS[key]['cmap'] for key in PARAMETERS.keys() if key == parameter]
+    
+    fig = get_plot(x, y, z, c[0], title, ylabel, zlabel)
 
-    total_mask = y.mask | z.mask | np.isnan(y) | np.isnan(z)
-    y.mask = total_mask
-    z.mask = total_mask
-
-    z = np.squeeze(z)
-    y = np.squeeze(y)
-    x = get_times(nc, x, z)
-
-    title = title + ' ' + parameter[0].upper() + parameter[1:] + ' Profiles'
-    fig = get_plot(x, y, z, PARAMETERS[parameter]['cmap'], title=title, zlabel=PARAMETERS[parameter]['display'])
     fig.set_size_inches(20, 5)
-    # fig.savefig(filepath, dpi=100)
 
     img_data = io.BytesIO()
     plt.savefig(img_data, format='png')
@@ -145,21 +209,3 @@ def plot_from_nc(title, nc, parameter, filepath):
     bucket.put_object(Body=img_data, ContentType='image/png', Key=filepath)
 
     plt.close(fig)
-
-
-def get_variables(nc, parameter):
-    y = nc.variables['pressure'][0, :, :]
-    z = nc.variables[parameter][0, :, :]
-    x = nc.variables['time'][0, :]
-    return x, y, z
-
-
-def fix_profiles(y, z):
-    '''
-    Inverts the profile in-place if it is an upcast, so the mesh has a correct y-axis
-    '''
-    for i in range(y.shape[0]):
-        # if profile is flipped
-        if len(y[i][~y[i].mask]) and y[i][~y[i].mask][0] > y[i][~y[i].mask][-1]:
-            y[i][~y[i].mask] = y[i][~y[i].mask][::-1]
-            z[i][~z[i].mask] = z[i][~z[i].mask][::-1]
