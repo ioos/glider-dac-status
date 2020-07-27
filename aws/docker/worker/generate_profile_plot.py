@@ -156,18 +156,10 @@ def get_plot(x, y, z, cmap='cmap', title='Glider Profiles', ylabel='Pressure (db
     if len(z[np.logical_not(np.isnan(z))]) == 0:
         ax.set_ylim(0, 10)
         # annotate the plot to report data issue
-<<<<<<< HEAD
-        ax.annotate(
-            zlabel.split('/')[0] + ' are all nan',
-            xy=(x[150], 5),
-            xytext=(x[100], 6),
-        )
-=======
         bbox_props = dict(boxstyle="round", fc="w", ec="0.5", alpha=0.9)
         ax.text(x[round(len(x) / 2)], 5, zlabel.split('/')[0] + ' data is missing',
                 ha="center", va="center", size=20,
                 bbox=bbox_props)
->>>>>>> 6781e07... Update generate_profile_plot.py
     else:
         zz = z[np.logical_not(np.isnan(z))]
         std = np.nanstd(zz)
