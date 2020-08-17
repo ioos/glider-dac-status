@@ -6,6 +6,7 @@ from app import celery, app
 from datetime import datetime
 from celery.utils.log import get_task_logger
 from status.profile_plots import generate_profile_plots
+from status.trajectories import generate_trajectories
 from urllib.parse import urlencode
 import status.clocks as clock
 import json
@@ -42,42 +43,6 @@ def write_json(data):
     return True
 
 
-def get_trajectory(erddap_url):
-    '''
-    Reads the trajectory information from ERDDAP and returns a GEOJSON like
-    structure.
-    '''
-    # https://gliders.ioos.us/erddap/tabledap/ru01-20140104T1621.json?latitude,longitude&time&orderBy(%22time%22)
-    url = erddap_url.replace('html', 'json')
-    # ERDDAP requires the variable being sorted to be present in the variable
-    # list.  The time variable will be removed before converting to GeoJSON
-    url += '?longitude,latitude,time&orderBy(%22time%22)'
-    response = requests.get(url, timeout=180)
-    if response.status_code != 200:
-        raise IOError("Failed to get trajectories")
-    data = response.json()
-    geo_data = {
-        'type': 'LineString',
-        'coordinates': [c[0:2] for c in data['table']['rows']]
-    }
-    return geo_data
-
-
-def write_trajectory(deployment, geo_data):
-    '''
-    Writes a geojson like python structure to the appropriate data file
-    '''
-    trajectory_dir = app.config.get('TRAJECTORY_DIR')
-    username = deployment['username']
-    name = deployment['name']
-    dir_path = os.path.join(trajectory_dir, username)
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-    file_path = os.path.join(dir_path, name + '.json')
-    with open(file_path, 'wb') as f:
-        f.write(json.dumps(geo_data))
-
-
 @celery.task()
 def generate_dac_profile_plots():
     profile_plot_dir = app.config.get('PROFILE_PLOT_DIR')
@@ -86,23 +51,7 @@ def generate_dac_profile_plots():
 
 @celery.task(time_limit=300)
 def get_trajectory_features():
-    deployments_url = app.config.get('DAC_API')
-
-    response = requests.get(deployments_url, timeout=60)
-    if response.status_code != 200:
-        raise IOError("Failed to get response from DAC ACPI")
-    data = response.json()
-    deployments = data['results']
-    for d in deployments:
-        logger.info("Reading deployment %s", d['deployment_dir'])
-        try:
-            geo_data = get_trajectory(d['erddap'])
-            write_trajectory(d, geo_data)
-        except IOError:
-            logger.exception("Failed to get trajectory for %s",
-                             d['deployment_dir'])
-
-    return deployments
+    return generate_trajectories()
 
 
 @celery.task()
@@ -309,7 +258,6 @@ def get_dac_status(time_limit=300):
         meta['tds'] = None
         if tds_request.status_code == 200:
             meta['tds'] = tds_das_url.replace('.das', '.html')
-
         # Add the deployment metadata to the return object
         deployments['datasets'].append(collections.OrderedDict(
             sorted(list(meta.items()), key=lambda t: t[0])))

@@ -1,2 +1,3 @@
 config.local.yml
 *.sw[po]
+web/static/json/trajectories/
