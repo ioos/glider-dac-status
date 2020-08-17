@@ -12,7 +12,8 @@ import os
 import traceback
 from datetime import datetime
 from erddapy import ERDDAP
-from pandas import pd
+import pandas as pd
+import requests
 
 __version__ = '0.3.0'
 
@@ -103,17 +104,23 @@ def get_erddap_data(dataset_id):
     :return: pandas DataFrame with deployment variable values
     '''
     e = ERDDAP(
-        server='http://gliders.ioos.us/erddap',
+        server='https://gliders.ioos.us/erddap',
         protocol='tabledap',
-             )
-    info_url = e.get_info_url(dataset_id=dataset_id, response='csv')
+    )
+    try:
+        info_url = e.get_info_url(dataset_id=dataset_id, response='csv')
+    except requests.exceptions.HTTPError as err:
+        raise SystemExit(err)
+
     info = pd.read_csv(info_url)
 
     n_info = info.loc[info['Attribute Name'] == '_CoordinateAxisType']
-    coords_var = n_info['Variable Name'].values
+    coords_var = list(n_info['Variable Name'].values)
 
     v_info = info.loc[info['Attribute Name'] == 'standard_name']
 
+    # prepare list of CTD variables for plotting
+    ctd_vars = []
     # prepare list of science variables for plotting
     sci_vars = []
     # update PARAMETERS dictionary:
@@ -123,30 +130,32 @@ def get_erddap_data(dataset_id):
     # (2) delete parameters that are not found in the data files
     del_par = []
 
-    for parameter in PARAMETERS:
-        sn_var = PARAMETERS[parameter]['standard_name']
-        vv_info = v_info.loc[v_info['Value'] == sn_var]
-        if len(vv_info) != 0:
-            try:
-                print('try', parameter)
-                sci_vars.append(vv_info['Variable Name'].values[0])
-            except IndexError:
-                print('except', parameter)
-                sn_var = PARAMETERS[parameter]['standard_name_']
-                vv_info = v_info.loc[v_info['Value'] == sn_var]
-                sci_vars.append(vv_info['Variable Name'].values[0])
+    for ii, parameter in enumerate(PARAMETERS):
+        # use standard_name to create a list of science parameters to plot
+        if ii not in range(4):
+            sn_var = PARAMETERS[parameter]['standard_name']
+            vv_info = v_info.loc[v_info['Value'] == sn_var]
+            if len(vv_info) != 0:
+                try:
+                    sci_vars.append(vv_info['Variable Name'].values[0])
+                except IndexError:
+                    logging.exception("standard_name changed for variable {}".format(parameter))
+                    traceback.print_exc()
+                    sn_var = PARAMETERS[parameter]['standard_name_']
+                    vv_info = v_info.loc[v_info['Value'] == sn_var]
+                    sci_vars.append(vv_info['Variable Name'].values[0])
 
-            if vv_info['Variable Name'].values[0] != parameter:
-                old_par.append(parameter)
-                new_par.append(vv_info['Variable Name'].values[0])
+                if vv_info['Variable Name'].values[0] != parameter:
+                    old_par.append(parameter)
+                    new_par.append(vv_info['Variable Name'].values[0])
+            else:
+                del_par.append(parameter)
+        # use parameter name defined in PARAMETERS to create a list of CTD variables to plot
         else:
-            del_par.append(parameter)
-            print('IF ', sn_var, ' not in file for ', parameter)
+            ctd_vars.append(parameter)
 
-
-    # write list of science variables for plotting and add data coordinates.
-    list_var = list(np.append(coords_var,sci_vars))
-
+    # add data coordinates and CTD parameters to the list of science variables for plotting.
+    list_var = coords_var + sci_vars + ctd_vars
 
     # (1) replace the parameter name by the one used in the data file.
     if len(new_par) != 0:
@@ -176,8 +185,8 @@ def get_variables(dataset, parameter):
             x_name y_name z_name: string parameter name
     '''
     if 'Error' in dataset.keys()[0]:
-        print(dataset[dataset.keys()[0]][1])
-        exit()
+        error = dataset[dataset.keys()[0]][1]
+        print("Dataset {} with error {}".format(dataset, error))
 
     # get the names of the columns from the dataset
     y_name = [name for name in dataset.keys() if 'depth' in name]
@@ -200,7 +209,8 @@ def get_variables(dataset, parameter):
             ii.append(i)
         except TypeError:
             error = 'strptime() argument 1 must be str, not float'
-    #         print(error)
+            logging.exception("Date {} with error {}".format(dataset, error))
+            traceback.print_exc()
 
     # select only non-nan values
     yv = [y[n] for n in ii]
@@ -233,7 +243,6 @@ def get_plot(x, y, z, cmap='cmap', title='Glider Profiles', ylabel='Pressure (db
     :return fig: figure handle
     '''
 
-    # print(title)
     fig, ax = plt.subplots()
     ax.set_title(title)
 
