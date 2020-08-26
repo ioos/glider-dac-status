@@ -40,7 +40,7 @@ celery.Task = ContextTask
 celery.conf.beat_schedule = {
     "get_dac_status_task": {
         "task": "status.tasks.get_dac_status",
-        "schedule": crontab(minute="*/15")  # Run every 15 mins
+        "schedule": crontab(minute="15,45")  # Run every half hour on min 15 and 45
     },
     "get_dac_trajectories_task": {
         "task": "status.tasks.get_trajectory_features",
