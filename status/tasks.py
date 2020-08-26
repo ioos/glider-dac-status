@@ -55,7 +55,7 @@ def get_trajectory_features():
 
 
 @celery.task()
-def get_dac_status(time_limit=300):
+def get_dac_status(time_limit=600):
     dac_api_url = app.config.get('DAC_API')
     erddap_url = app.config.get('ERDDAP_URL')
     file_dir = app.config.get('FILE_DIR')
