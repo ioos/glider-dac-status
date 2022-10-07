@@ -106,8 +106,8 @@ def generate_trajectories(deployments=None):
             recent_data = is_recent_data(deployment)
             existing_trajectory = trajectory_exists(deployment)
             if (not deployment["name"].endswith("-delayed") and
-                recent_update or recent_data or not existing_trajectory
-                or not deployment["completed"]):
+                (recent_update or recent_data or not existing_trajectory
+                or not deployment["completed"])):
                 geo_data = get_trajectory(deployment['erddap'])
                 write_trajectory(deployment, geo_data)
         except Exception:

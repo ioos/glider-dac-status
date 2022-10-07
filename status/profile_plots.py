@@ -80,8 +80,8 @@ def generate_profile_plots(deployments=None):
             recent_update = is_recent_update(deployment['updated'])
             recent_data = is_recent_data(deployment)
             if (not deployment["name"].endswith("-delayed")
-                and recent_update or recent_data or
-                not deployment["completed"]):
+                and (recent_update or recent_data or
+                not deployment["completed"])):
                 # Send message to SQS queue
                 message_body = dict(
                     erddap_dataset=deployment['erddap']
