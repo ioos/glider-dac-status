@@ -79,7 +79,9 @@ def generate_profile_plots(deployments=None):
             # Only plot if the deployment has been recently updated or the data is recent
             recent_update = is_recent_update(deployment['updated'])
             recent_data = is_recent_data(deployment)
-            if (recent_update or recent_data):
+            if (not deployment["name"].endswith("-delayed")
+                and recent_update or recent_data or
+                not deployment["completed"]):
                 # Send message to SQS queue
                 message_body = dict(
                     erddap_dataset=deployment['erddap']
