@@ -46,15 +46,13 @@ def generate_profile_plot(erddap_dataset):
     df = get_erddap_data(dataset_id)
 
     for parameter in PARAMETERS:
-        title = dataset_id + ' ' + parameter[0].upper() + parameter[1:] + ' Profiles'
+        title = f"{dataset_id} {parameter.title()} Profiles"
         filename = '{}/{}.png'.format(dataset_id, parameter)
         try:
             plot_from_pd(title, df, parameter, filename)
         except Exception:
             logging.exception("Failed to generate plot for {}, dataset = {}".format(parameter, dataset_id))
             traceback.print_exc()
-            continue
-    return 0
 
 
 def get_erddap_data(dataset_id):
@@ -194,7 +192,8 @@ def plot_from_pd(title, dataset, parameter, filepath):
     '''
     x, y, z, xlabel, ylabel, zlabel = get_variables(dataset, parameter)
 
-    c = [PARAMETERS[key]['cmap'] for key in PARAMETERS.keys() if key == parameter]
+    c = [PARAMETERS[key]['cmap'] for key in PARAMETERS.keys()
+         if key == parameter]
 
     fig = get_plot(x, y, z, c[0], title, ylabel, zlabel)
 

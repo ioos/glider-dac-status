@@ -22,8 +22,8 @@ COPY requirements/requirements.txt /requirements.txt
 WORKDIR /glider-dac-status
 
 RUN apt-get update && \
-    apt-get install -y python3-netcdf4 && \
-    pip install --no-cache cython gunicorn && \
+    apt-get install -y python3-netcdf4 libnetcdf-dev libhdf5-dev && \
+    pip install --no-cache 'Cython<3.0' gunicorn && \
     pip install --no-cache -r /requirements.txt && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd -g $glider_gid_uid glider && \
