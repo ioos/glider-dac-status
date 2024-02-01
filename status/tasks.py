@@ -45,8 +45,7 @@ def write_json(data):
 
 @celery.task()
 def generate_dac_profile_plots():
-    profile_plot_dir = app.config.get('PROFILE_PLOT_DIR')
-    return generate_profile_plots(profile_plot_dir)
+    return generate_profile_plots()
 
 
 @celery.task(time_limit=300)
