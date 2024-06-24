@@ -12,7 +12,7 @@ import os
 import traceback
 from datetime import datetime
 from erddapy import ERDDAP
-
+from pandas import pd
 
 __version__ = '0.3.0'
 
@@ -20,21 +20,61 @@ PARAMETERS = {
 
     'salinity': {
         'cmap': cmocean.cm.haline,
-        'display': u'Salinity'
+        'display': u'Salinity',
+        'standard_name': 'sea_water_practical_salinity',
+        'standard_name_': 'sea_water_salinity'
     },
     'temperature': {
         'cmap': cmocean.cm.thermal,
-        'display': u'Temperature (°C)'
+        'display': u'Temperature (°C)',
+        'standard_name': 'sea_water_temperature'
     },
     'conductivity': {
         'cmap': cmocean.cm.haline,
-        'display': u'Conductivity (S m-1)'
+        'display': u'Conductivity (S m-1)',
+        'standard_name': 'sea_water_electrical_conductivity'
     },
     'density': {
         'cmap': cmocean.cm.dense,
         'display': u'Density (kg m-3)',
+        'standard_name': 'sea_water_density'
+    },
+
+    'oxygen':{
+        'cmap': cmocean.cm.oxy,
+        'display': u'Oxygen (umol kg-1)',
+        'standard_name': 'moles_of_oxygen_per_unit_mass_in_sea_water'
+    },
+
+    'chlorophyll':{
+        'cmap': cmocean.cm.algae,
+        'display': u'Chlorophyll (ug l-1)',
+        'standard_name': 'mass_concentration_of_chlorophyll_a_in_sea_water',
+        'standard_name_': 'mass_concentration_of_chlorophyll_in_sea_water'
+    },
+
+    'colored_dissolved_organic_matter': {
+        'cmap': cmocean.cm.matter,
+        'display': u'Colored Dissolved Organic Matter (ppb)',
+        'standard_name': 'concentration_of_colored_dissolved_organic_matter_in_sea_water_expressed_as_equivalent_mass_fraction_of_quinine_sulfate_dihydrate',
+        'standard_name_': 'volume_absorption_coefficient_of_radiative_flux_in_sea_water_due_to_dissolved_organic_matter'
+    },
+
+    'optical_backscatter': {
+        'cmap': cmocean.cm.turbid,
+        'display': u'Optical Backscatter (m-1)',
+        'standard_name': 'volume_scattering_coefficient_of_radiative_flux_in_sea_water',
+        'standard_name_': 'volume_backwards_scattering_coefficient_of_radiative_flux_in_sea_water'
+    },
+
+    'photosynthetically_active_radiation': {
+        'cmap': cmocean.cm.solar,
+        'display': u'Photosynthetically Active Radiation (umol m-2 s-1)',
+        'standard_name': 'downwelling_photosynthetic_photon_spherical_irradiance_in_sea_water',
     }
+
 }
+
 
 
 def generate_profile_plot(erddap_dataset):
@@ -63,22 +103,67 @@ def get_erddap_data(dataset_id):
     :return: pandas DataFrame with deployment variable values
     '''
     e = ERDDAP(
-        server='https://gliders.ioos.us/erddap',
+        server='http://gliders.ioos.us/erddap',
         protocol='tabledap',
-    )
+             )
+    info_url = e.get_info_url(dataset_id=dataset_id, response='csv')
+    info = pd.read_csv(info_url)
+
+    n_info = info.loc[info['Attribute Name'] == '_CoordinateAxisType']
+    coords_var = n_info['Variable Name'].values
+
+    v_info = info.loc[info['Attribute Name'] == 'standard_name']
+
+    # prepare list of science variables for plotting
+    sci_vars = []
+    # update PARAMETERS dictionary:
+    # (1) replace the parameter name by the one used in the data file.
+    old_par = []
+    new_par = []
+    # (2) delete parameters that are not found in the data files
+    del_par = []
+
+    for parameter in PARAMETERS:
+        sn_var = PARAMETERS[parameter]['standard_name']
+        vv_info = v_info.loc[v_info['Value'] == sn_var]
+        if len(vv_info) != 0:
+            try:
+                print('try', parameter)
+                sci_vars.append(vv_info['Variable Name'].values[0])
+            except IndexError:
+                print('except', parameter)
+                sn_var = PARAMETERS[parameter]['standard_name_']
+                vv_info = v_info.loc[v_info['Value'] == sn_var]
+                sci_vars.append(vv_info['Variable Name'].values[0])
+
+            if vv_info['Variable Name'].values[0] != parameter:
+                old_par.append(parameter)
+                new_par.append(vv_info['Variable Name'].values[0])
+        else:
+            del_par.append(parameter)
+            print('IF ', sn_var, ' not in file for ', parameter)
+
+
+    # write list of science variables for plotting and add data coordinates.
+    list_var = list(np.append(coords_var,sci_vars))
+
+
+    # (1) replace the parameter name by the one used in the data file.
+    if len(new_par) != 0:
+        for kk in range(len(new_par)):
+            PARAMETERS[new_par[kk]] = PARAMETERS.pop(old_par[kk])
+
+    # (2) delete parameters that are not found in the data files
+    if len(del_par) != 0:
+        for key in del_par:
+            PARAMETERS.pop(key, None)
+
     e.response = 'csv'
     e.dataset_id = dataset_id
-    e.variables = [
-        'depth',
-        'latitude',
-        'longitude',
-        'salinity',
-        'temperature',
-        'conductivity',
-        'density',
-        'time',
-    ]
+    e.variables = list_var
+
     df = e.to_pandas()
+
     return df
 
 
@@ -156,11 +241,10 @@ def get_plot(x, y, z, cmap='cmap', title='Glider Profiles', ylabel='Pressure (db
     if len(z[np.logical_not(np.isnan(z))]) == 0:
         ax.set_ylim(0, 10)
         # annotate the plot to report data issue
-        ax.annotate(
-            zlabel.split('/')[0] + ' are all nan',
-            xy=(x[150], 5),
-            xytext=(x[100], 6),
-        )
+        bbox_props = dict(boxstyle="round", fc="w", ec="0.5", alpha=0.9)
+        ax.text(x[round(len(x) / 2)], 5, zlabel.split('/')[0] + ' data is missing',
+                ha="center", va="center", size=20,
+                bbox=bbox_props)
     else:
         zz = z[np.logical_not(np.isnan(z))]
         std = np.nanstd(zz)
