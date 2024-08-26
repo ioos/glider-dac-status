@@ -7,6 +7,7 @@ import sys
 from app import app
 from shapely.geometry import LineString
 from status.profile_plots import iter_deployments, is_recent_data, is_recent_update
+from requests.exceptions import RequestException
 
 
 def get_trajectory(erddap_url):
@@ -19,18 +20,30 @@ def get_trajectory(erddap_url):
     # ERDDAP requires the variable being sorted to be present in the variable
     # list.  The time variable will be removed before converting to GeoJSON
 
-    url += '?longitude,latitude,qartod_location_flag,time&orderBy(%22time%22)'
-    response = requests.get(url, timeout=180)
-    if response.status_code != 200:
-        raise IOError("Failed to fetch trajectories: {}".format(erddap_url))
+    valid_response = False
+    for qc_append in ("qartod_location_flag,", ""):
+        url_append = url + f"?longitude,latitude,{qc_append}time&orderBy(%22time%22)"
+        try:
+            response = requests.get(url_append, timeout=180, allow_redirects=True)
+            response.raise_for_status()
+        except RequestException:
+            continue
+        else:
+            valid_response = True
+            break
+
+    if not valid_response:
+        raise IOError("Failed to fetch trajectories: {}".format(url_append))
+
     data = response.json()
     geo_data = {
         'type': 'LineString',
         'coordinates': [c[0:2] for c in data['table']['rows']],
-        'flag': [c[2:3] for c in data['table']['rows']]
+        'flag': ([c[2:3] for c in data['table']['rows']]
+                 if "qartod_location_flag" in data['table']['columnNames'] else None)
     }
 
-    geometry = parse_geometry(geo_data)
+    geometry = parse_geometry(geo_data, geo_data['flag'] is not None)
     coords = LineString(geometry['coordinates'])
     trajectory = coords.simplify(0.02, preserve_topology=False)
     geometry = {
@@ -71,20 +84,26 @@ def write_trajectory(deployment, geo_data):
         f.write(json.dumps(geo_data))
 
 
-def parse_geometry(geometry):
+def parse_geometry(geometry: dict, has_flag: bool):
     '''
     Filters out potentially bad coordinate pairs as returned from
-    GliderDAC. Returns a safe geometry object.
+    GliderDAC if location flags exist. Returns a safe geometry object.
 
     :param dict geometry: A GeoJSON Geometry object
+    :param bool has_flag: Whether of not location flags exist in this dataset
     '''
     coords = []
-
-    for index, flag in enumerate(geometry['profile_id']):      
-        if flag[0] != 1:
-            continue
-
+    if not has_flag:
+        for lon, lat in geometry['coordinates']:
+            if lon is None or lat is None:
+                continue
+            coords.append([lon, lat])
+    else:
+        for index, flag in enumerate(geometry['profile_id']):
+            if flag[0] != 1:
+                continue
         coords.append(geometry['coordinates'][index])
+
     return {'coordinates': coords}
 
 
