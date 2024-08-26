@@ -18,14 +18,16 @@ def get_trajectory(erddap_url):
     url = erddap_url.replace('html', 'json')
     # ERDDAP requires the variable being sorted to be present in the variable
     # list.  The time variable will be removed before converting to GeoJSON
-    url += '?longitude,latitude,time&orderBy(%22time%22)'
+
+    url += '?longitude,latitude,qartod_location_flag,time&orderBy(%22time%22)'
     response = requests.get(url, timeout=180)
     if response.status_code != 200:
         raise IOError("Failed to fetch trajectories: {}".format(erddap_url))
     data = response.json()
     geo_data = {
         'type': 'LineString',
-        'coordinates': [c[0:2] for c in data['table']['rows']]
+        'coordinates': [c[0:2] for c in data['table']['rows']],
+        'flag': [c[2:3] for c in data['table']['rows']]
     }
 
     geometry = parse_geometry(geo_data)
@@ -77,10 +79,12 @@ def parse_geometry(geometry):
     :param dict geometry: A GeoJSON Geometry object
     '''
     coords = []
-    for lon, lat in geometry['coordinates']:
-        if lon is None or lat is None:
+
+    for index, flag in enumerate(geometry['profile_id']):      
+        if flag[0] != 1:
             continue
-        coords.append([lon, lat])
+
+        coords.append(geometry['coordinates'][index])
     return {'coordinates': coords}
 
 
