@@ -204,7 +204,7 @@ def plot_from_pd(title, dataset, parameter, filepath):
     img_data.seek(0)
 
     s3 = boto3.resource('s3')
-    S3_BUCKET = os.environ['AWS_S3_BUCKET'] or 'ioos-glider-plots'
+    S3_BUCKET = os.environ.get('AWS_S3_BUCKET', 'ioos-glider-plots')
     bucket = s3.Bucket(S3_BUCKET)
     bucket.put_object(Body=img_data, ContentType='image/png', Key=filepath)
 

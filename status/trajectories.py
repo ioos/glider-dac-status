@@ -26,7 +26,8 @@ def get_trajectory(erddap_url):
         try:
             response = requests.get(url_append, timeout=180, allow_redirects=True)
             response.raise_for_status()
-        except RequestException:
+        except RequestException as e:
+            print(e)
             continue
         else:
             valid_response = True
@@ -99,10 +100,10 @@ def parse_geometry(geometry: dict, has_flag: bool):
                 continue
             coords.append([lon, lat])
     else:
-        for index, flag in enumerate(geometry['profile_id']):
+        for lon_lat, flag in zip(geometry['coordinates'], geometry['flag']):
             if flag[0] != 1:
                 continue
-        coords.append(geometry['coordinates'][index])
+            coords.append(lon_lat)
 
     return {'coordinates': coords}
 

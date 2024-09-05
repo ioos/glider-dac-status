@@ -2,7 +2,8 @@
 '''
 status.tasks
 '''
-from app import celery, app
+from app import app
+from celery import shared_task
 from datetime import datetime
 from celery.utils.log import get_task_logger
 from status.profile_plots import generate_profile_plots
@@ -43,17 +44,17 @@ def write_json(data):
     return True
 
 
-@celery.task()
+@shared_task
 def generate_dac_profile_plots():
     return generate_profile_plots()
 
 
-@celery.task(time_limit=300)
+@shared_task
 def get_trajectory_features():
     return generate_trajectories()
 
 
-@celery.task()
+@shared_task
 def get_dac_status(time_limit=600):
     dac_api_url = app.config.get('DAC_API')
     erddap_url = app.config.get('ERDDAP_URL')

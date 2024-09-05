@@ -32,18 +32,23 @@ services:
       # - ./config.local.yml:/glider-dac-status/config.local.yml
       # - /tmp/status.json:/glider-dac-status/web/static/json/status.json
       # - /tmp/web/static/profiles/:/glider-dac-status/web/static/profiles/
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379
+      - CELERY_RESULT_BACKEND=redis://redis:6379
     depends_on:
       - redis
-    command: celery worker -A app.celery --loglevel=info
+    command: celery worker -A app.celery_app --loglevel=info
 
   celery_beat:
-    build: .
     volumes:
       # For Local
       - .:/glider-dac-status/
       # For Dev/Prod
       # - ./config.local.yml:/glider-dac-status/config.local.yml
-    command: celery beat -A app.celery --loglevel=info
+    command: celery beat -A app.celery_app --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379
+      - CELERY_RESULT_BACKEND=redis://redis:6379
 
 volumes:
   redis_data:
