@@ -199,13 +199,11 @@ def plot_from_pd(title, dataset, parameter, filepath):
 
     fig.set_size_inches(20, 5)
 
-    img_data = io.BytesIO()
-    plt.savefig(img_data, format='png')
-    img_data.seek(0)
+    with io.BytesIO() as img_data:
+        plt.savefig(img_data, format='png')
+        img_data.seek(0)
+        plot_obj.put(Body=img_data, ContentType='image/png',
+                    Metadata={"min_time": plot_min_time_str,
+                              "max_time": plot_max_time_str})
 
-    s3 = boto3.resource('s3')
-    S3_BUCKET = os.environ.get('AWS_S3_BUCKET', 'ioos-glider-plots')
-    bucket = s3.Bucket(S3_BUCKET)
-    bucket.put_object(Body=img_data, ContentType='image/png', Key=filepath)
-
-    plt.close(fig)
+        plt.close(fig)
