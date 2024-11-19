@@ -123,7 +123,10 @@ def generate_trajectories(deployments=None):
     '''
     Determine which trajectories need to be built, and write geojson to file
     '''
+    # TODO: Use a less brute force approach to filtering
     for deployment in iter_deployments():
+        if deployments is not None and deployment["name"] not in deployments:
+            continue
         try:
             # Only add if the deployment has been recently updated or the data is recent
             recent_update = is_recent_update(deployment['updated'])
