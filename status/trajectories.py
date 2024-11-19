@@ -101,7 +101,7 @@ def parse_geometry(geometry: dict, has_flag: bool):
             coords.append([lon, lat])
     else:
         for lon_lat, flag in zip(geometry['coordinates'], geometry['flag']):
-            if flag[0] != 1:
+            if flag[0] != 1 or lon_lat[0] is None or lon_lat[1] is None:
                 continue
             coords.append(lon_lat)
 
