@@ -12,7 +12,8 @@ RUN yarn global add grunt-cli && \
 FROM python:3.6
 ARG glider_gid_uid=1000
 
-RUN mkdir -p /glider-dac-status
+RUN mkdir -p /glider-dac-status /mpl_config
+VOLUME /mpl_config
 RUN mkdir /glider-dac-status/logs
 COPY app.py config.yml flask_environments.py manage.py /glider-dac-status/
 COPY status /glider-dac-status/status
@@ -32,6 +33,7 @@ RUN apt-get update && \
 
 ENV FLASK_ENV="PRODUCTION"
 COPY --from=buildstep /web/ /glider-dac-status/web
-RUN chown -R glider:glider /glider-dac-status/
+RUN chown -R glider:glider /glider-dac-status/ /mpl_config
+
 USER glider
 EXPOSE 5000
