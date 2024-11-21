@@ -10,6 +10,7 @@ import numpy as np
 import numpy.ma as ma
 import os
 import pandas as pd
+from typing import Tuple
 import urllib.error
 import traceback
 from datetime import datetime
@@ -76,7 +77,7 @@ def generate_profile_plot(erddap_dataset):
         else:
             logging.info(f"Datetime extents of previous graph for {filename} unchanged, skipping.")
 
-def check_time_min_max(dataset_name: str) -> str, str:
+def check_time_min_max(dataset_name: str) -> Tuple[str, str]:
     '''
     :param str erddap_dataset: ERDDAP endpoint
     :return str: Minimum temporal extent ISO 8601 date string or empty string if not detected
