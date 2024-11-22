@@ -100,10 +100,11 @@ def parse_geometry(geometry: dict, has_flag: bool):
                 continue
             coords.append([lon, lat])
     else:
-        for lon_lat, flag in zip(geometry['coordinates'], geometry['flag']):
-            if flag[0] != 1 or lon_lat[0] is None or lon_lat[1] is None:
+        for (lon, lat), flag in zip(geometry['coordinates'], geometry['flag']):
+            if (flag[0] is not None and flag[0] != 1 or
+                lon is None or lat is None):
                 continue
-            coords.append(lon_lat)
+            coords.append([lon, lat])
 
     return {'coordinates': coords}
 
