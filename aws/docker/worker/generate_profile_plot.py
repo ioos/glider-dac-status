@@ -2,6 +2,7 @@ import matplotlib
 matplotlib.use('AGG')
 import matplotlib.dates as mdates
 import boto3
+import botocore
 import cmocean
 import io
 import logging
@@ -60,22 +61,30 @@ def generate_profile_plot(erddap_dataset):
         filename = '{}/{}.png'.format(dataset_id, parameter)
         try:
             graph_obj = s3.Object(S3_BUCKET, filename)
+            graph_obj.load()
         # catch all here instead of using botocore.exceptions.ClientError
         # if we can't access an object and it later fails to write
         # the graph image we'll want to throw an exception anyhow
-        except:
-            logging.exception("Failed attempting to fetch object for time min/max determination")
-        # TODO: Add further levels of cache invalidation in case dataset is reuploaded,
-        #       removed, etc.
-        if (graph_obj.metadata.get("min_time") != time_min or
-            graph_obj.metadata.get("max_time") != time_max):
+        except botocore.exceptions.ClientError:
+            logging.exception("Failed attempting to fetch object for time min/max determination, "
+                              "file possibly did not exist prior to this call")
             try:
                 plot_from_pd(title, df, parameter, graph_obj, time_min, time_max)
             except:
                 logging.exception("Failed to generate plot for {}, dataset = {}".format(parameter, dataset_id))
                 traceback.print_exc()
+        # TODO: Add further levels of cache invalidation in case dataset is reuploaded,
+        #       removed, etc.
         else:
-            logging.info(f"Datetime extents of previous graph for {filename} unchanged, skipping.")
+            if (graph_obj.metadata.get("min_time") != time_min or
+                graph_obj.metadata.get("max_time") != time_max):
+                try:
+                    plot_from_pd(title, df, parameter, graph_obj, time_min, time_max)
+                except:
+                    logging.exception("Failed to generate plot for {}, dataset = {}".format(parameter, dataset_id))
+                    traceback.print_exc()
+            else:
+                logging.info(f"Datetime extents of previous graph for {filename} unchanged, skipping.")
 
 def check_time_min_max(dataset_name: str) -> Tuple[str, str]:
     '''
