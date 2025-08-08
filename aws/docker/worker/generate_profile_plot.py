@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('AGG')
+import matplotlib.style as mplstyle
 import matplotlib.dates as mdates
 import boto3
 import botocore
@@ -19,6 +19,8 @@ from erddapy import ERDDAP
 
 
 __version__ = '0.3.0'
+matplotlib.use('AGG')
+mplstyle.use('fast')
 
 PARAMETERS = {
 
