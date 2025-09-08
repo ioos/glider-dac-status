@@ -10,7 +10,7 @@
     // JSON urls
     this.status_url = 'static/json/status.json';
     this.meta_base_url = 'static/json/deployments';
-    
+
     // Data containers
     this.status_datasets = [];
     this.incomplete_datasets = [];
@@ -50,7 +50,7 @@
       container : "body",
       html: true
     };
-    
+
     // Delegate Bootstrap popovers
     $('body').popover(this.popoverOptions);
 
@@ -140,7 +140,7 @@
     // Fill in the providers nav dropdown
     $("#providers-dropdown").html(Mustache.render(this.provider_template, sortedProviders));
 
-    // Get the list of wmo ids for which we have datasets and remove 
+    // Get the list of wmo ids for which we have datasets and remove
     // null values
     var wmo_ids = _.filter(_.uniq(_.map(this.status_datasets, function(dataset) {
       return dataset.wmo_id;
@@ -204,7 +204,6 @@
 
 
   DacStatus.prototype.onClickIncompleteDatasets = function(event) {
-    console.log("incomplete");
     if(typeof event !== "undefined") {
       event.preventDefault();
       // Set/remove .active on relevant navbar list-items
@@ -297,6 +296,9 @@
     }
     if (record.updated) {
       record.updated = moment.utc(record.updated).format('YYYY-MM-DD<br />HH:mm');
+    }
+    if (record.nc_file_last_update) {
+      record.nc_file_last_update = moment.utc(record.nc_file_last_update).format('YYYY-MM-DD<br />HH:mm');
     }
     if (record.start) {
       record.start = moment.utc(record.start).format('YYYY-MM-DD<br />HH:mm');

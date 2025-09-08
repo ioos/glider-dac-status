@@ -2,10 +2,13 @@
 '''
 status.tasks
 '''
-from app import celery, app
+from app import app
+from celery import shared_task
 from datetime import datetime
 from celery.utils.log import get_task_logger
-from urllib import urlencode
+from status.profile_plots import generate_profile_plots
+from status.trajectories import generate_trajectories
+from urllib.parse import urlencode
 import status.clocks as clock
 import json
 import os
@@ -14,6 +17,7 @@ import time
 import re
 import collections
 import requests
+import glob
 
 logger = get_task_logger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -33,75 +37,30 @@ def write_json(data):
         logger.error('JSON FILE IS NONE')
         return False
 
-    with open(json_file, 'wb') as f:
+    with open(json_file, 'w') as f:
         f.write(json.dumps(data))
 
     logger.info('Updated %s', json_file)
     return True
 
 
-def get_trajectory(erddap_url):
-    '''
-    Reads the trajectory information from ERDDAP and returns a GEOJSON like
-    structure.
-    '''
-    # http://data.ioos.us/gliders/erddap/tabledap/ru01-20140104T1621.json?latitude,longitude&trajectory=%22ru01-20140104T1621%22
-    url = erddap_url.replace('html', 'json')
-    url += '?longitude,latitude'
-    response = requests.get(url)
-    if response.status_code != 200:
-        raise IOError("Failed to get trajectories")
-    data = response.json()
-    geo_data = {
-        'type': 'LineString',
-        'coordinates': data['table']['rows']
-    }
-    return geo_data
+@shared_task
+def generate_dac_profile_plots():
+    return generate_profile_plots()
 
 
-def write_trajectory(deployment, geo_data):
-    '''
-    Writes a geojson like python structure to the appropriate data file
-    '''
-    trajectory_dir = app.config.get('TRAJECTORY_DIR')
-    username = deployment['username']
-    name = deployment['name']
-    dir_path = os.path.join(trajectory_dir, username)
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-    file_path = os.path.join(dir_path, name + '.json')
-    with open(file_path, 'wb') as f:
-        f.write(json.dumps(geo_data))
-
-
-@celery.task()
+@shared_task
 def get_trajectory_features():
-    erddap_url = app.config.get('ERDDAP_URL')
-    deployments_url = app.config.get('DAC_API')
-
-    response = requests.get(deployments_url)
-    if response.status_code != 200:
-        raise IOError("Failed to get response from DAC ACPI")
-    data = response.json()
-    deployments = data['results']
-    for d in deployments:
-        logger.info("Reading deployment %s", d['deployment_dir'])
-        try:
-            geo_data = get_trajectory(d['erddap'])
-            write_trajectory(d, geo_data)
-        except IOError:
-            logger.exception("Failed to get trajectory for %s",
-                             d['deployment_dir'])
-
-    return deployments
+    return generate_trajectories()
 
 
-@celery.task()
-def get_dac_status():
+@shared_task
+def get_dac_status(time_limit=600):
     dac_api_url = app.config.get('DAC_API')
     erddap_url = app.config.get('ERDDAP_URL')
-    deployment_url_template = 'http://data.ioos.us/gliders/providers/deployment/{:s}'
-    tds_url_template = 'http://data.ioos.us/gliders/thredds/dodsC/deployments/{:s}/{:s}/catalog.html?dataset=deployments/{:s}/{:s}/{:s}.nc3.nc'
+    file_dir = app.config.get('FILE_DIR')
+    deployment_url_template = 'https://gliders.ioos.us/providers/deployment/{:s}'
+    tds_url_template = 'https://gliders.ioos.us/thredds/dodsC/deployments/{:s}/{:s}/catalog.html?dataset=deployments/{:s}/{:s}/{:s}.nc3.nc'
     deployments = {
         'meta': {
             'fetch_time': time.strftime('%b %d, %Y %H:%M Z', time.gmtime())
@@ -127,7 +86,7 @@ def get_dac_status():
         'rss': 'rss',
         'summary': 'summary'
     }
-    columns = variables.keys()
+    columns = list(variables.keys())
     # Time coverage regexs
     t0_re = re.compile(
         'time_coverage_start\s"(\d{4}\-\d{2}\-\d{2}T\d{2}:\d{2}:\d{2}Z)"')
@@ -135,7 +94,7 @@ def get_dac_status():
         'time_coverage_end\s"(\d{4}\-\d{2}\-\d{2}T\d{2}:\d{2}:\d{2}Z)"')
     # Request the dac deployments metadata
     logger.info('Fetching DAC deployments: %s', dac_api_url)
-    dac_request = requests.get(dac_api_url)
+    dac_request = requests.get(dac_api_url, timeout=60)
     if dac_request.status_code != 200:
         logger.error('ERDDAP request failed: %s (%s)',
                      dac_api_url, dac_request.reason)
@@ -203,7 +162,7 @@ def get_dac_status():
 
             # Request the ERDDAP Data Attribute Structure (.das) document
             logger.info('Fetching das: %s', das_url)
-            das_request = requests.get(das_url)
+            das_request = requests.get(das_url, timeout=60)
             if das_request.status_code != 200:
                 logger.error('das request failed: %s (%s)',
                              das_url, das_request.reason)
@@ -245,7 +204,7 @@ def get_dac_status():
                 json_url = meta['tabledap'] + '.json'
                 data_url = '?'.join([json_url, 'wmo_id,profile_id'])
                 logger.info('Fetching data url: %s', data_url)
-                r = requests.get(data_url)
+                r = requests.get(data_url, timeout=120)
                 if r.status_code != 200:
                     logger.error('Dataset fetch error: %s', r.reason)
                     continue
@@ -261,7 +220,7 @@ def get_dac_status():
                 if len(profiles) > 0:
                     meta['num_profiles'] = max(profiles)
 
-        for name in dac_record.keys():
+        for name in list(dac_record.keys()):
             meta[name] = dac_record[name]
 
         # Try to fetch the THREDDS .das to see if the dataset exists
@@ -270,15 +229,38 @@ def get_dac_status():
                                               meta['username'],
                                               meta['name'],
                                               meta['name'])
+        meta['potential_invalid_files'] = []
+        if file_dir is not None:
+            deployment_loc = os.path.join(file_dir, meta['deployment_dir'])
+            logger.info('Fetching DAC raw files from {}'.format(deployment_loc))
+            # count of all the netCDF files in the particular directory
+            dep_nc_files = glob.glob(os.path.join(deployment_loc, '*.nc'))
+            meta['nc_files_count'] = len(dep_nc_files)
+            try:
+                latest_nc_file = max(dep_nc_files, key=os.path.getmtime)
+            # if empty, set the netCDF files to None
+            except ValueError:
+                meta['latest_nc_file'] = None
+                meta['nc_file_last_update'] = None
+            else:
+                meta['latest_nc_file'] = os.path.basename(latest_nc_file)
+                latest = int(os.path.getmtime(latest_nc_file) * 1000)
+
+                meta['nc_file_last_update'] = latest
+        # if the file_dir variable is None, just leave the keys empty
+        else:
+            for key in ('nc_files_count', 'latest_nc_file',
+                        'nc_file_last_update'):
+                meta[key] = None
+
         logger.info('Fetching THREDDS catalog: %s', tds_das_url)
         tds_request = requests.get(tds_das_url)
         meta['tds'] = None
         if tds_request.status_code == 200:
             meta['tds'] = tds_das_url.replace('.das', '.html')
-
         # Add the deployment metadata to the return object
         deployments['datasets'].append(collections.OrderedDict(
-            sorted(meta.items(), key=lambda t: t[0])))
+            sorted(list(meta.items()), key=lambda t: t[0])))
 
     status = write_json(deployments)
     return status

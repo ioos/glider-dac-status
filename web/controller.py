@@ -10,7 +10,6 @@ from flask import render_template, url_for
 
 @api.route('/')
 def index():
-    print url_for('.static', filename='index.html')
     return api.send_static_file('index.html')
 
 @api.route('/summary')

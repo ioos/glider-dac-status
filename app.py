@@ -4,30 +4,66 @@ app
 
 The application context
 '''
+from celery import Celery, Task
+from celery.schedules import crontab
 from flask import Flask, url_for, jsonify
 from flask_environments import Environments
-from celery import Celery
 import os
-
-celery = Celery('__main__')
-print hex(id(celery))
 
 
 app = Flask(__name__, static_folder='web/static')
 env = Environments(app, default_env='DEVELOPMENT')
 env.from_yaml('config.yml')
+# Override config file with local version
+if os.path.exists('config.local.yml'):
+    env.from_yaml('config.local.yml')
 
-celery.conf.update(BROKER_URL=app.config['REDIS_URL'],
-            CELERY_RESULT_BACKEND=app.config['REDIS_URL'])
-TaskBase = celery.Task
+def celery_init_app(app: Flask) -> Celery:
+    class FlaskTask(Task):
+        def __call__(self, *args: object, **kwargs: object) -> object:
+            with app.app_context():
+                return self.run(*args, **kwargs)
+
+    celery_app = Celery("app", task_cls=FlaskTask,
+                        broker_url=app.config['REDIS_URL'],
+                        result_backend=app.config['REDIS_URL'])
+    #celery_app.config_from_object(app.config["CELERY"])
+    celery_app.set_default()
+    app.extensions["celery"] = celery_app
+    return celery_app
+
+celery_app = celery_init_app(app)
+
+TaskBase = celery_app.Task
+
+
 class ContextTask(TaskBase):
     abstract = True
+
     def __call__(self, *args, **kwargs):
         with app.app_context():
             return TaskBase.__call__(self, *args, **kwargs)
-celery.Task = ContextTask
 
-if app.config['LOGGING'] == True:
+
+celery_app.Task = ContextTask
+
+# Set up periodic tasks
+celery_app.conf.beat_schedule = {
+    "get_dac_status_task": {
+        "task": "status.tasks.get_dac_status",
+        "schedule": crontab(minute="15,45")  # Run every half hour on min 15 and 45
+    },
+    "get_dac_trajectories_task": {
+        "task": "status.tasks.get_trajectory_features",
+        "schedule": crontab(minute=10, hour="*/1")  # Run every hr
+    },
+    "get_dac_profile_plots_task": {
+        "task": "status.tasks.generate_dac_profile_plots",
+        "schedule": crontab(minute=0, hour='*/6')  # Run 4 times a day
+    },
+}
+
+if app.config['LOGGING'] is True:
     import logging
     logger = logging.getLogger('replicate')
     logger.setLevel(logging.DEBUG)
@@ -44,9 +80,9 @@ if app.config['LOGGING'] == True:
     file_handler.setFormatter(formatter)
     stream_handler.setFormatter(formatter)
     app.logger.addHandler(file_handler)
-    #app.logger.addHandler(stream_handler)
     app.logger.setLevel(logging.DEBUG)
     app.logger.info('Application Process Started')
+
 
 def has_no_empty_params(rule):
     '''
@@ -56,7 +92,7 @@ def has_no_empty_params(rule):
     arguments = rule.arguments if rule.arguments is not None else ()
     return len(defaults) >= len(arguments)
 
-#route("/site-map")
+
 def site_map():
     '''
     Returns a json structure for the site routes and handlers
@@ -71,6 +107,7 @@ def site_map():
     # links is now a list of url, endpoint tuples
     return jsonify(rules=links)
 
+
 # handle proxy server headers
 from status.reverse_proxy import ReverseProxied
 app.wsgi_app = ReverseProxied(app.wsgi_app)
@@ -84,13 +121,15 @@ app.register_blueprint(web_blueprint)
 if app.config['DEBUG']:
     app.add_url_rule('/site-map', 'site_map', site_map)
 
+
 def main():
     '''
     Runs the application
     '''
-    app.run(host=app.config['HOST'], port=app.config['PORT'], debug=app.config['DEBUG'])
+    app.run(host=app.config['HOST'], port=app.config['PORT'],
+            debug=app.config['DEBUG'])
     return 0
+
 
 if __name__ == '__main__':
     main()
-

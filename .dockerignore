@@ -1,0 +1,5 @@
+config.local.yml
+*.sw[po]
+web/static/json/trajectories/
+web/static/profiles
+celerybeat.pid

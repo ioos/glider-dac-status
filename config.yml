@@ -1,4 +1,4 @@
-COMMON: &common
+DEFAULT: &common
   LOGGING: True
   LOG_DIRECTORY: logs
   LOG_FILE: 'status.log'
@@ -8,16 +8,23 @@ COMMON: &common
   DEBUG: True
   #SERVER_NAME: localhost
   JSONIFY_PRETTYPRINT_REGULAR: true
-  REDIS_URL: 'redis://localhost:6379'
+  REDIS_URL: 'redis://redis:6379'
   STATUS_JSON: 'web/static/json/status.json'
   TRAJECTORY_DIR: 'web/static/json/trajectories/'
-  ERDDAP_URL: 'http://data.ioos.us/gliders/erddap/tabledap/allDatasets.json'
-  DAC_API: 'http://data.ioos.us/gliders/providers/api/deployment'
+  PROFILE_PLOT_DIR: 'web/static/profiles/'
+  ERDDAP_URL: 'https://gliders.ioos.us/erddap/tabledap/allDatasets.json'
+  DAC_API: 'https://gliders.ioos.us/providers/api/deployment'
+  FILE_DIR: '/data/data/priv_erddap/'
   GLIDER_EMAIL:
     EMAIL_ACCOUNT: "xxxxxxxxxxxxxxxxxxxxxxxxx"
     EMAIL_PASSWORD: "xxxxxxxxxxxxxxxxxxxxxxxxx"
     EMAIL_FOLDER: "xxxxxxxxxxxxxxxxxxxxxxxxx"
     OUTPUT_DIRECTORY: 'navo/cache'
+  AWS:
+    SQS_QUEUE_URL: "xxxxxxxxxxxxxxxxxxxxxxxxx"
+    ACCESS_KEY_ID: "xxxxxxxxxxxxxxxxxxxxxxxxx"
+    SECRET_ACCESS_KEY: "xxxxxxxxxxxxxxxxxxxxxxxxx"
+    REGION_NAME: "xxxxxxxxxxxxxxxxxxxxxxxxx"
 
 DEVELOPMENT: &development
   <<: *common
