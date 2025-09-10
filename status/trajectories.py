@@ -13,7 +13,6 @@ from requests.exceptions import RequestException
 import numpy as np
 from datetime import datetime
 
-
 # Load higher-resolution land polygons for better accuracy
 land_shp = shpreader.natural_earth(resolution='10m', category='physical', name='land')
 land_geom = list(shpreader.Reader(land_shp).geometries())
@@ -34,6 +33,7 @@ def get_trajectory(erddap_url):
 
     # ERDDAP requires the variable being sorted to be present in the variable
     # list. The time variable will be removed before converting to GeoJSON
+
     valid_response = False
     for qc_append in ("qartod_location_test_flag,", ""):
         url_append = url + f"?longitude,latitude,{qc_append}time&orderBy(%22time%22)"
