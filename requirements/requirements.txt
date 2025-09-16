@@ -18,3 +18,7 @@ scipy
 cartopy==0.25.0
 numpy==2.2.5
 shapely==2.1.0
+netCDF4>=1.4.2
+netcdftime>=1.0.0a2
+boto3==1.13.18
+erddapy
