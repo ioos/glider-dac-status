@@ -63,7 +63,7 @@ RUN pip install --no-cache-dir --prefer-binary -r /requirements.txt
 
 # 7. Create user
 RUN groupadd -g $glider_gid_uid glider && \
-    useradd -u $glider_gid_uid -g $glider_gid_uid glider
+    useradd -m -u $glider_gid_uid -g $glider_gid_uid glider
 
 ENV FLASK_ENV="PRODUCTION"
 COPY --from=buildstep /web/ /glider-dac-status/web
