@@ -1,9 +1,14 @@
-version: '2.1'
+#version: '2.1'
 
 services:
   flask_app:
     restart: always
     build: .
+    environment:
+      - CARTOPY_USER_BACKGROUNDS=/tmp/cartopy_data
+      - CARTOPY_DATA_DIR=/tmp/cartopy_data
+      - MPLCONFIGDIR=/tmp/mplconfig
+      - XDG_CACHE_HOME=/tmp/.cache  # helps Fontconfig
     ports:
       - 8000:5000
     volumes:
@@ -37,19 +42,24 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379
     depends_on:
       - redis
-    command: celery worker -A app.celery_app --loglevel=info
+    command: celery -A app.celery_app worker --loglevel=info
 
   celery_beat:
     restart: always
+    build:
+        context: .
+        dockerfile: Dockerfile
     volumes:
       # For Local
       - .:/glider-dac-status/
       # For Dev/Prod
       # - ./config.local.yml:/glider-dac-status/config.local.yml
-    command: celery beat -A app.celery_app --loglevel=info
+    command: celery -A app.celery_app beat --loglevel=info
     environment:
       - CELERY_BROKER_URL=redis://redis:6379
       - CELERY_RESULT_BACKEND=redis://redis:6379
+    depends_on:
+      - redis
 
 volumes:
   redis_data:

@@ -2,16 +2,21 @@
 # -*- coding: utf-8 -*-
 import json
 import requests
-import os
 import sys
 from app import app
 from shapely.geometry import LineString
 import shapely.geometry as sgeom
-import cartopy.io.shapereader as shpreader
 from status.profile_plots import iter_deployments, is_recent_data, is_recent_update
 from requests.exceptions import RequestException
 import numpy as np
 from datetime import datetime
+
+import os
+os.environ["CARTOPY_USER_BACKGROUNDS"] = "/tmp/cartopy"
+os.environ["CARTOPY_DATA_DIR"] = "/tmp/cartopy"
+
+import cartopy.io.shapereader as shpreader
+
 
 # Load higher-resolution land polygons for better accuracy
 land_shp = shpreader.natural_earth(resolution='10m', category='physical', name='land')
