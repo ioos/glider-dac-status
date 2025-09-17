@@ -1,5 +1,5 @@
 FROM node:13.0.1-alpine AS buildstep
-LABEL maintainer "RPS <devops@rpsgroup.com>"
+LABEL maintainer="RPS <devops@rpsgroup.com>"
 
 RUN mkdir -p /web
 WORKDIR /web
@@ -59,19 +59,14 @@ RUN pip install "setuptools<58"
 RUN pip install --no-cache-dir 'Cython<3.0' gunicorn
 
 # 6. Install project requirements
-COPY requirements/requirements.txt /requirements.txt
 RUN pip install --no-cache-dir --prefer-binary -r /requirements.txt
 
 # 7. Create user
 RUN groupadd -g $glider_gid_uid glider && \
     useradd -u $glider_gid_uid -g $glider_gid_uid glider
 
-
 ENV FLASK_ENV="PRODUCTION"
 COPY --from=buildstep /web/ /glider-dac-status/web
-RUN chown -R glider:glider /glider-dac-status/ /mpl_config
-
-# ...
 RUN chown -R glider:glider /glider-dac-status/ /mpl_config
 
 ENV CARTOPY_USER_BACKGROUNDS=/tmp/cartopy_data
