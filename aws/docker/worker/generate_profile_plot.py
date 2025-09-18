@@ -15,6 +15,7 @@ from typing import Tuple
 import urllib.error
 import traceback
 from datetime import datetime
+from httpx import HTTPError
 from erddapy import ERDDAP
 
 
@@ -57,6 +58,8 @@ def generate_profile_plot(erddap_dataset):
 
 
     df = get_erddap_data(dataset_id)
+    if df is None:
+        return
 
     for parameter in PARAMETERS:
         title = f"{dataset_id} {parameter.title()} Profiles"
@@ -125,8 +128,12 @@ def get_erddap_data(dataset_id):
         'density',
         'time',
     ]
-    df = e.to_pandas()
-    return df
+    try:
+        df = e.to_pandas()
+    except HTTPError:
+        logging.exception(f"Error fetching from {dataset_id}: ")
+    else:
+        return df
 
 
 def get_variables(dataset, parameter):
