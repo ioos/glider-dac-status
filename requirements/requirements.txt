@@ -1,20 +1,24 @@
 Flask==1.1.1
 Flask-RESTful==0.3.1
+argparse==1.4.0
 Jinja2>=2.10.1
-MarkupSafe==0.23
+MarkupSafe==1.1.1 # Safer than 0.23 (update optional)
 PyYAML==5.1
-Werkzeug>=0.15
+Werkzeug==0.16.1 
 aniso8601==0.92
-argparse==1.2.1
 itsdangerous==0.24
-pytz==2014.10
-celery==4.4.0
+pytz>=2023.3 # pandas==1.5.3 requires a version > 2014.10
+celery==5.3.1
 redis>=3.2.0
 requests==2.22.0
 Flask-Script==2.0.5
-matplotlib>=2.2.4
+matplotlib>=3.1
 cmocean==2.0
+scipy
+numpy==1.24.4
+pandas==1.5.3
+cartopy==0.21.1
+shapely==2.0.1
 netCDF4>=1.4.2
-netcdftime>=1.0.0a2
 boto3==1.13.18
-shapely==1.7.0
+erddapy

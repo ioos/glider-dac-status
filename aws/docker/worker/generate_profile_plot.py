@@ -1,7 +1,8 @@
 import matplotlib
-matplotlib.use('AGG')
+import matplotlib.style as mplstyle
 import matplotlib.dates as mdates
 import boto3
+import botocore
 import cmocean
 import io
 import logging
@@ -9,12 +10,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.ma as ma
 import os
+import pandas as pd
+from typing import Tuple
+import urllib.error
 import traceback
 from datetime import datetime
+from httpx import HTTPError
 from erddapy import ERDDAP
 
 
 __version__ = '0.3.0'
+matplotlib.use('AGG')
+mplstyle.use('fast')
 
 PARAMETERS = {
 
@@ -43,19 +50,62 @@ def generate_profile_plot(erddap_dataset):
     :param str erddap_dataset: ERDDAP endpoint
     '''
     dataset_id = erddap_dataset.split('/')[-1].split('.html')[0]
+    time_min, time_max = check_time_min_max(dataset_id)
+
+    s3 = boto3.resource('s3')
+    S3_BUCKET = os.environ.get('AWS_S3_BUCKET', 'ioos-glider-plots')
+    bucket = s3.Bucket(S3_BUCKET)
+
+
     df = get_erddap_data(dataset_id)
+    if df is None:
+        return
 
     for parameter in PARAMETERS:
-        title = dataset_id + ' ' + parameter[0].upper() + parameter[1:] + ' Profiles'
+        title = f"{dataset_id} {parameter.title()} Profiles"
         filename = '{}/{}.png'.format(dataset_id, parameter)
         try:
-            plot_from_pd(title, df, parameter, filename)
-        except Exception:
-            logging.exception("Failed to generate plot for {}, dataset = {}".format(parameter, dataset_id))
-            traceback.print_exc()
-            continue
-    return 0
+            graph_obj = s3.Object(S3_BUCKET, filename)
+            graph_obj.load()
+        # catch all here instead of using botocore.exceptions.ClientError
+        # if we can't access an object and it later fails to write
+        # the graph image we'll want to throw an exception anyhow
+        except botocore.exceptions.ClientError:
+            logging.exception("Failed attempting to fetch object for time min/max determination, "
+                              "file possibly did not exist prior to this call")
+            try:
+                plot_from_pd(title, df, parameter, graph_obj, time_min, time_max)
+            except:
+                logging.exception("Failed to generate plot for {}, dataset = {}".format(parameter, dataset_id))
+                traceback.print_exc()
+        # TODO: Add further levels of cache invalidation in case dataset is reuploaded,
+        #       removed, etc.
+        else:
+            if (graph_obj.metadata.get("min_time") != time_min or
+                graph_obj.metadata.get("max_time") != time_max):
+                try:
+                    plot_from_pd(title, df, parameter, graph_obj, time_min, time_max)
+                except:
+                    logging.exception("Failed to generate plot for {}, dataset = {}".format(parameter, dataset_id))
+                    traceback.print_exc()
+            else:
+                logging.info(f"Datetime extents of previous graph for {filename} unchanged, skipping.")
 
+def check_time_min_max(dataset_name: str) -> Tuple[str, str]:
+    '''
+    :param str erddap_dataset: ERDDAP endpoint
+    :return str: Minimum temporal extent ISO 8601 date string or empty string if not detected
+    :return str: Maximum temporal extent ISO 8601 date string or empty string if not detected
+    '''
+    try:
+        time_min, time_max = pd.read_csv(f"https://gliders.ioos.us/erddap/tabledap/{dataset_name}.csv?time&orderByMinMax(%22time%22)", skiprows=[1]).squeeze()
+        return time_min, time_max
+    except urllib.error.HTTPError:
+        logging.exception(f"HTTP exception attempting to detect min/max of dataset {dataset_name}, skipping.")
+        return "", ""
+    except:
+        logging.exception(f"Other error occurred attempting to detect min/max of dataset {dataset_name}, skipping.")
+        return "", ""
 
 def get_erddap_data(dataset_id):
     '''
@@ -78,8 +128,12 @@ def get_erddap_data(dataset_id):
         'density',
         'time',
     ]
-    df = e.to_pandas()
-    return df
+    try:
+        df = e.to_pandas()
+    except HTTPError:
+        logging.exception(f"Error fetching from {dataset_id}: ")
+    else:
+        return df
 
 
 def get_variables(dataset, parameter):
@@ -184,29 +238,31 @@ def get_plot(x, y, z, cmap='cmap', title='Glider Profiles', ylabel='Pressure (db
     return fig
 
 
-def plot_from_pd(title, dataset, parameter, filepath):
+def plot_from_pd(title, dataset, parameter, plot_obj,
+                 plot_min_time_str, plot_max_time_str):
     '''
     Plot the parameter from an ERDDAP .csv file put into a pandas DataFrame.
     :param str title: Title of the plot
-    :param array Dataset: A pandas array values
-    :param str parameter: Parameter to plot
-    :param str filepath: Location to save the figure to (PNG)
+    :param pandas.DataFrame dataset: A DataFrame containing values to plot
+    :param str parameter: Parameter name to plot
+    :param boto3.S3.Object: The S3 object used for storing the plot
+    :param str min_time_str: The minimum time string represented as an ISO8601 datetime
+    :param str max_time_str: The maximum time string represented as an ISO8601 datetime
     '''
     x, y, z, xlabel, ylabel, zlabel = get_variables(dataset, parameter)
 
-    c = [PARAMETERS[key]['cmap'] for key in PARAMETERS.keys() if key == parameter]
+    c = [PARAMETERS[key]['cmap'] for key in PARAMETERS.keys()
+         if key == parameter]
 
     fig = get_plot(x, y, z, c[0], title, ylabel, zlabel)
 
     fig.set_size_inches(20, 5)
 
-    img_data = io.BytesIO()
-    plt.savefig(img_data, format='png')
-    img_data.seek(0)
+    with io.BytesIO() as img_data:
+        plt.savefig(img_data, format='png')
+        img_data.seek(0)
+        plot_obj.put(Body=img_data, ContentType='image/png',
+                    Metadata={"min_time": plot_min_time_str,
+                              "max_time": plot_max_time_str})
 
-    s3 = boto3.resource('s3')
-    S3_BUCKET = os.environ['AWS_S3_BUCKET'] or 'ioos-glider-plots'
-    bucket = s3.Bucket(S3_BUCKET)
-    bucket.put_object(Body=img_data, ContentType='image/png', Key=filepath)
-
-    plt.close(fig)
+        plt.close(fig)
