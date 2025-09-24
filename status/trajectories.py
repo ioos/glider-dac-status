@@ -53,7 +53,7 @@ def get_trajectory(erddap_url):
             break
 
     if not valid_response:
-        raise IOError(f"Failed to fetch trajectories: {url_append}")
+        app.logger.error(f"Failed to fetch trajectories: {url_append}")
 
     data = response.json()
 
