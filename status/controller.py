@@ -9,7 +9,7 @@ routes and logic API
 import requests
 from flask import jsonify, current_app
 from status import api
-from status.tasks import get_trajectory
+from status.trajectories import get_trajectory
 from status.glider_days import glider_days
 from flask import jsonify, request, current_app, make_response
 import requests
