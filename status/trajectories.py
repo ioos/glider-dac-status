@@ -155,19 +155,7 @@ def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = N
     # --- Step 2: Remove points that fall on land ---
     sea_coords = [(lon, lat) for lon, lat in filtered_coords if not is_on_land(lon, lat)]
     
-    # --- Step 3: Remove statistical outliers ---
-    if sea_coords:
-        lons = np.array([lon for lon, _ in sea_coords])
-        lats = np.array([lat for _, lat in sea_coords])
-
-        z_lon = np.abs((lons - lons.mean()) / lons.std())
-        z_lat = np.abs((lats - lats.mean()) / lats.std())
-
-        threshold = 3
-        coords = [(lon, lat) for (lon, lat), zl, zt in zip(sea_coords, z_lon, z_lat)
-                  if zl <= threshold and zt <= threshold]
-    
-    return {'coordinates': coords}
+    return {'coordinates': sea_coords}
 
 
 def is_on_land(lon, lat):
