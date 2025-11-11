@@ -9,9 +9,10 @@ routes and logic API
 import requests
 from flask import jsonify, current_app
 from status import api
-from status.trajectories import get_trajectory
-
-
+from status.tasks import get_trajectory
+from status.glider_days import glider_days
+from flask import jsonify, request, current_app, make_response
+import requests
 @api.route('/test')
 def test():
     return jsonify(message="Running")
@@ -46,3 +47,17 @@ def track(username, deployment_name):
     erddap_url = deployment['erddap']
     geo_data = get_trajectory(erddap_url)
     return jsonify(**geo_data)
+
+@api.route('/gliderdac/days')
+def get_glider_days():
+    '''
+    Return a csv file containing the gliderDAC deployment
+    days for each operator
+    '''
+    year = request.args.get('year', None)
+    data = glider_days(year)
+    response = make_response(data)
+    response.headers["Content-Disposition"] = "attachment; filename=glider_days.csv"
+    response.headers["Content-type"] = "text/csv"
+    return response
+
