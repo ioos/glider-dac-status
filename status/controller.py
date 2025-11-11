@@ -6,24 +6,27 @@ The controller definition for the status application. This mostly contains the
 routes and logic API
 '''
 
+import requests
+from flask import jsonify, current_app
 from status import api
 from status.tasks import get_trajectory
 from status.glider_days import glider_days
 from flask import jsonify, request, current_app, make_response
 import requests
-
 @api.route('/test')
 def test():
     return jsonify(message="Running")
 
-#--------------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------------
 # Proxies - Use with caution
-#--------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
 @api.route('/deployment', methods=['GET'])
 def get_deployments():
     url = current_app.config.get('DAC_API')
     response = requests.get(url)
     return response.content, response.status_code, dict(response.headers)
+
 
 @api.route('/deployment/<string:username>/<string:deployment_name>', methods=['GET'])
 def get_deployment(username, deployment_name):
@@ -31,7 +34,7 @@ def get_deployment(username, deployment_name):
     url += '/%s/%s' % (username, deployment_name)
     response = requests.get(url)
     return response.content, response.status_code, dict(response.headers)
-#--------------------------------------------------------------------------------
+
 
 @api.route('/track/<string:username>/<string:deployment_name>')
 def track(username, deployment_name):
@@ -57,3 +60,4 @@ def get_glider_days():
     response.headers["Content-Disposition"] = "attachment; filename=glider_days.csv"
     response.headers["Content-type"] = "text/csv"
     return response
+
