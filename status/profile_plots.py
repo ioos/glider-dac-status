@@ -8,6 +8,7 @@ import requests
 import sys
 from datetime import datetime, timedelta
 from flask import current_app
+from aws.docker.worker.generate_profile_plot import generate_profile_plot
 
 
 def iter_deployments():
@@ -54,7 +55,7 @@ def is_recent_data(deployment):
 
     return t0 <= end_time
 
-def generate_profile_plots(deployments=None):
+def generate_profile_plots(deployments=None, use_sqs=False):
     '''
     Builds a directory of profile plots from the GliderDAC deployments
     '''
@@ -86,15 +87,18 @@ def generate_profile_plots(deployments=None):
                 message_body = dict(
                     erddap_dataset=deployment['erddap']
                 )
-                sqs.send_message(
-                    QueueUrl=queue_url,
-                    DelaySeconds=10,
-                    MessageBody=json.dumps(message_body)
-                )
+                # TODO: consider binding to a higher order function
+                if use_sqs:
+                    sqs.send_message(
+                        QueueUrl=queue_url,
+                        DelaySeconds=10,
+                        MessageBody=json.dumps(message_body)
+                    )
+                else:
+                    generate_profile_plot(deployment["erddap"])
         except Exception:
             from traceback import print_exc
             print_exc()
-    return 0
 
 
 if __name__ == '__main__':

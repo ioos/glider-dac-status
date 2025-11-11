@@ -4,14 +4,12 @@ app
 
 The application context
 '''
-from celery import Celery
+from celery import Celery, Task
 from celery.schedules import crontab
 from flask import Flask, url_for, jsonify
 from flask_environments import Environments
 import os
 
-
-celery = Celery('__main__')
 
 app = Flask(__name__, static_folder='web/static')
 env = Environments(app, default_env='DEVELOPMENT')
@@ -20,10 +18,23 @@ env.from_yaml('config.yml')
 if os.path.exists('config.local.yml'):
     env.from_yaml('config.local.yml')
 
-celery.conf.update(broker_url=app.config['REDIS_URL'],
-                   result_backend=app.config['REDIS_URL'])
+def celery_init_app(app: Flask) -> Celery:
+    class FlaskTask(Task):
+        def __call__(self, *args: object, **kwargs: object) -> object:
+            with app.app_context():
+                return self.run(*args, **kwargs)
 
-TaskBase = celery.Task
+    celery_app = Celery("app", task_cls=FlaskTask,
+                        broker_url=app.config['REDIS_URL'],
+                        result_backend=app.config['REDIS_URL'])
+    #celery_app.config_from_object(app.config["CELERY"])
+    celery_app.set_default()
+    app.extensions["celery"] = celery_app
+    return celery_app
+
+celery_app = celery_init_app(app)
+
+TaskBase = celery_app.Task
 
 
 class ContextTask(TaskBase):
@@ -34,10 +45,10 @@ class ContextTask(TaskBase):
             return TaskBase.__call__(self, *args, **kwargs)
 
 
-celery.Task = ContextTask
+celery_app.Task = ContextTask
 
 # Set up periodic tasks
-celery.conf.beat_schedule = {
+celery_app.conf.beat_schedule = {
     "get_dac_status_task": {
         "task": "status.tasks.get_dac_status",
         "schedule": crontab(minute="15,45")  # Run every half hour on min 15 and 45
