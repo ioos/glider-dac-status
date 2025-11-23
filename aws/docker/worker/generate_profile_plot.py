@@ -52,6 +52,7 @@ def generate_profile_plot(erddap_dataset):
     dataset_id = erddap_dataset.split('/')[-1].split('.html')[0]
     time_min, time_max = check_time_min_max(dataset_id)
 
+    # TODO: Add local storage options for development setup
     s3 = boto3.resource('s3')
     S3_BUCKET = os.environ.get('AWS_S3_BUCKET', 'ioos-glider-plots')
     bucket = s3.Bucket(S3_BUCKET)
@@ -106,6 +107,24 @@ def check_time_min_max(dataset_name: str) -> Tuple[str, str]:
     except:
         logging.exception(f"Other error occurred attempting to detect min/max of dataset {dataset_name}, skipping.")
         return "", ""
+
+def lambda_handler(event, context):
+    '''
+    Plot the parameters for a deployment
+    :param dict deployment: A deployment object
+    :param str path: Folder path to where to store the images
+    '''
+    try:
+        generate_profile_plot(event["erddap_dataset"]):
+    except Exception:
+        print("Failed to generate plots for {event['erddap_dataset']}")
+        traceback.print_exc()
+        continue
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps('success')
+    }
 
 def get_erddap_data(dataset_id):
     '''

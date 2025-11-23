@@ -21,7 +21,8 @@ DEFAULT: &common
     EMAIL_FOLDER: "xxxxxxxxxxxxxxxxxxxxxxxxx"
     OUTPUT_DIRECTORY: 'navo/cache'
   AWS:
-    SQS_QUEUE_URL: "xxxxxxxxxxxxxxxxxxxxxxxxx"
+    # set to true only if you want to use Lambda to offload processing of glider plots
+    USE_LAMBDA: False
     ACCESS_KEY_ID: "xxxxxxxxxxxxxxxxxxxxxxxxx"
     SECRET_ACCESS_KEY: "xxxxxxxxxxxxxxxxxxxxxxxxx"
     REGION_NAME: "xxxxxxxxxxxxxxxxxxxxxxxxx"
