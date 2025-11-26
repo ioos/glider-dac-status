@@ -1,7 +1,8 @@
 DEFAULT: &common
   LOGGING: True
-  LOG_DIRECTORY: logs
-  LOG_FILE: 'status.log'
+  # enable to log to file
+  #LOG_DIRECTORY: logs
+  #LOG_FILE: 'status.log'
   SECRET_KEY: 'cf875e6a24f845e29a824b5de962981d'
   HOST: localhost
   PORT: 4000

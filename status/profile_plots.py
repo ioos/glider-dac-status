@@ -8,7 +8,7 @@ import requests
 import sys
 from datetime import datetime, timedelta
 from flask import current_app
-from aws.docker.worker.generate_profile_plot import generate_profile_plot
+from status.aws.docker.worker.generate_profile_plot import generate_profile_plot
 
 
 def iter_deployments():
