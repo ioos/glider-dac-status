@@ -8,7 +8,7 @@ import requests
 import sys
 from datetime import datetime, timedelta
 from flask import current_app
-from aws.docker.worker.generate_profile_plot import generate_profile_plot
+from status.aws.docker.worker.generate_profile_plot import generate_profile_plot
 
 
 def iter_deployments():
@@ -55,24 +55,27 @@ def is_recent_data(deployment):
 
     return t0 <= end_time
 
-def generate_profile_plots(deployments=None, use_sqs=False):
+def generate_profile_plots(deployments=None):
     '''
     Builds a directory of profile plots from the GliderDAC deployments
     '''
-    # Create SQS client
-    sqs = boto3.client(
-        service_name='sqs',
-        region_name=current_app.config['AWS']['REGION_NAME'],
-        aws_access_key_id=current_app.config['AWS']['ACCESS_KEY_ID'],
-        aws_secret_access_key=current_app.config['AWS']['SECRET_ACCESS_KEY'],
-    )
-    queue_url = current_app.config['AWS']['SQS_QUEUE_URL']
+    if current_app.config["USE_LAMBDA"]:
+        lambda_client = boto3.client('lambda')
+        def plot_function(erddap_url):
+            lambda_client.invoke(
+                FunctionName='invoke_generate_profile_plot',
+                InvocationType='Event',    # async
+                Payload=json.dumps({"erddap_dataset": erddap_url}).encode('utf-8'))
+    else:
+        plot_function = generate_profile_plot
 
     for deployment in iter_deployments():
         try:
             for deployment_filter in deployments or []:
                 if deployment_filter in deployment['deployment_dir']:
                     break
+            # If we have filters but the deployment was not found in the filters, continue
+            # to other deployments
             else:
                 if deployments:
                     continue
@@ -83,19 +86,7 @@ def generate_profile_plots(deployments=None, use_sqs=False):
             if (not deployment["name"].endswith("-delayed")
                 and (recent_update or recent_data or
                 not deployment["completed"])):
-                # Send message to SQS queue
-                message_body = dict(
-                    erddap_dataset=deployment['erddap']
-                )
-                # TODO: consider binding to a higher order function
-                if use_sqs:
-                    sqs.send_message(
-                        QueueUrl=queue_url,
-                        DelaySeconds=10,
-                        MessageBody=json.dumps(message_body)
-                    )
-                else:
-                    generate_profile_plot(deployment["erddap"])
+                plot_function(deployment["erddap"])
         except Exception:
             from traceback import print_exc
             print_exc()

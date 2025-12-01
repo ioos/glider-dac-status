@@ -5,6 +5,7 @@ import boto3
 import botocore
 import cmocean
 import io
+import json
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,6 +23,9 @@ from erddapy import ERDDAP
 __version__ = '0.3.0'
 matplotlib.use('AGG')
 mplstyle.use('fast')
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 PARAMETERS = {
 
@@ -52,6 +56,7 @@ def generate_profile_plot(erddap_dataset):
     dataset_id = erddap_dataset.split('/')[-1].split('.html')[0]
     time_min, time_max = check_time_min_max(dataset_id)
 
+    # TODO: Add local storage options for development setup
     s3 = boto3.resource('s3')
     S3_BUCKET = os.environ.get('AWS_S3_BUCKET', 'ioos-glider-plots')
     bucket = s3.Bucket(S3_BUCKET)
@@ -71,12 +76,12 @@ def generate_profile_plot(erddap_dataset):
         # if we can't access an object and it later fails to write
         # the graph image we'll want to throw an exception anyhow
         except botocore.exceptions.ClientError:
-            logging.exception("Failed attempting to fetch object for time min/max determination, "
+            logger.exception("Failed attempting to fetch object for time min/max determination, "
                               "file possibly did not exist prior to this call")
             try:
                 plot_from_pd(title, df, parameter, graph_obj, time_min, time_max)
             except:
-                logging.exception("Failed to generate plot for {}, dataset = {}".format(parameter, dataset_id))
+                logger.exception("Failed to generate plot for {}, dataset = {}".format(parameter, dataset_id))
                 traceback.print_exc()
         # TODO: Add further levels of cache invalidation in case dataset is reuploaded,
         #       removed, etc.
@@ -86,10 +91,10 @@ def generate_profile_plot(erddap_dataset):
                 try:
                     plot_from_pd(title, df, parameter, graph_obj, time_min, time_max)
                 except:
-                    logging.exception("Failed to generate plot for {}, dataset = {}".format(parameter, dataset_id))
+                    logger.exception("Failed to generate plot for {}, dataset = {}".format(parameter, dataset_id))
                     traceback.print_exc()
             else:
-                logging.info(f"Datetime extents of previous graph for {filename} unchanged, skipping.")
+                logger.info(f"Datetime extents of previous graph for {filename} unchanged, skipping.")
 
 def check_time_min_max(dataset_name: str) -> Tuple[str, str]:
     '''
@@ -101,11 +106,28 @@ def check_time_min_max(dataset_name: str) -> Tuple[str, str]:
         time_min, time_max = pd.read_csv(f"https://gliders.ioos.us/erddap/tabledap/{dataset_name}.csv?time&orderByMinMax(%22time%22)", skiprows=[1]).squeeze()
         return time_min, time_max
     except urllib.error.HTTPError:
-        logging.exception(f"HTTP exception attempting to detect min/max of dataset {dataset_name}, skipping.")
+        logger.exception(f"HTTP exception attempting to detect min/max of dataset {dataset_name}, skipping.")
         return "", ""
     except:
-        logging.exception(f"Other error occurred attempting to detect min/max of dataset {dataset_name}, skipping.")
+        logger.exception(f"Other error occurred attempting to detect min/max of dataset {dataset_name}, skipping.")
         return "", ""
+
+def lambda_handler(event, context):
+    '''
+    Plot the parameters for a deployment
+    :param dict deployment: A deployment object
+    :param str path: Folder path to where to store the images
+    '''
+    try:
+        generate_profile_plot(event["erddap_dataset"])
+    except Exception:
+        print("Failed to generate plots for {event['erddap_dataset']}")
+        traceback.print_exc()
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps('success')
+    }
 
 def get_erddap_data(dataset_id):
     '''
@@ -131,7 +153,7 @@ def get_erddap_data(dataset_id):
     try:
         df = e.to_pandas()
     except HTTPError:
-        logging.exception(f"Error fetching from {dataset_id}: ")
+        logger.exception(f"Error fetching from {dataset_id}: ")
     else:
         return df
 

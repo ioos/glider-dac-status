@@ -10,6 +10,7 @@ from status.profile_plots import iter_deployments, is_recent_data, is_recent_upd
 from requests.exceptions import RequestException
 import numpy as np
 from datetime import datetime
+from functools import lru_cache
 
 import os
 os.environ["CARTOPY_USER_BACKGROUNDS"] = "/tmp/cartopy"
@@ -17,10 +18,13 @@ os.environ["CARTOPY_DATA_DIR"] = "/tmp/cartopy"
 
 import cartopy.io.shapereader as shpreader
 
+@lru_cache
+def get_land_geom():
+    # Load higher-resolution land polygons for better accuracy
+    land_shp = shpreader.natural_earth(resolution='10m', category='physical', name='land')
+    global land_geom
+    return list(shpreader.Reader(land_shp).geometries())
 
-# Load higher-resolution land polygons for better accuracy
-land_shp = shpreader.natural_earth(resolution='10m', category='physical', name='land')
-land_geom = list(shpreader.Reader(land_shp).geometries())
 
 def get_trajectory(erddap_url):
     '''
@@ -160,6 +164,7 @@ def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = N
 
 def is_on_land(lon, lat):
     """Check if coordinate is on land using shapely polygons."""
+    land_geom = get_land_geom()
     point = sgeom.Point(lon, lat)
     return any(poly.contains(point) for poly in land_geom)
 

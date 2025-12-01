@@ -68,18 +68,24 @@ if app.config['LOGGING'] is True:
     logger = logging.getLogger('replicate')
     logger.setLevel(logging.DEBUG)
 
-    log_directory = app.config.get('LOG_DIRECTORY', 'logs')
-    log_filename = app.config.get('LOG_FILE', 'status.log')
-    log_path = os.path.join(log_directory, log_filename)
-    if not os.path.exists(log_directory):
-        os.makedirs(log_directory)
-    file_handler = logging.FileHandler(log_path, mode='a+')
 
     stream_handler = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s - %(process)d - %(name)s - %(module)s:%(lineno)d - %(levelname)s - %(message)s')
-    file_handler.setFormatter(formatter)
-    stream_handler.setFormatter(formatter)
-    app.logger.addHandler(file_handler)
+
+    log_filename = app.config.get('LOG_FILE')
+    if log_filename is not None:
+        log_directory = app.config.get('LOG_DIRECTORY', 'logs')
+        log_path = os.path.join(log_directory, log_filename)
+        if not os.path.exists(log_directory):
+            os.makedirs(log_directory)
+        file_handler = logging.FileHandler(log_path, mode='a+')
+        file_handler.setFormatter(formatter)
+        log_path = os.path.join(log_directory, log_filename)
+        app.logger.addHandler(file_handler)
+    else:
+        stream_handler.setFormatter(formatter)
+        app.logger.addHandler(stream_handler)
+
     app.logger.setLevel(logging.DEBUG)
     app.logger.info('Application Process Started')
 
