@@ -5,7 +5,7 @@ argparse==1.4.0
 Jinja2>=2.10.1
 MarkupSafe==1.1.1 # Safer than 0.23 (update optional)
 PyYAML==5.1
-Werkzeug==0.16.1 
+Werkzeug==3.1.4 
 aniso8601==0.92
 itsdangerous==0.24
 pytz>=2023.3 # pandas==1.5.3 requires a version > 2014.10
