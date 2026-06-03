@@ -162,7 +162,7 @@ def get_dac_status(time_limit=600):
             meta["end"] = None
 
             # Create and add the dac2.0 deployment url
-            meta["dac_url"] = deployment_url_template.format(dac_record["id"])
+            meta["dac_url"] = deployment_url_template.format(dac_record["name"])
 
             # If the dac deployment name is in the ERDDAP dataset_ids, make an ERDDAP
             # request and fill in the missing metadata
