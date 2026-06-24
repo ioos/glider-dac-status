@@ -31,8 +31,7 @@ def is_recent_update(last_updated):
 
     :param int last_updated: Last update time in milliseconds since 1970
     '''
-    last_updated = last_updated / 1000  # convert to seconds
-    last_updated_dt = datetime.utcfromtimestamp(last_updated)
+    last_updated_dt = datetime.fromisoformat(last_updated)
     now = datetime.utcnow().timestamp()
     secs_elapsed = now - last_updated_dt.timestamp()
     one_week = 3 * 24 * 60 * 60
