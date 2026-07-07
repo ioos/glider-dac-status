@@ -6,6 +6,8 @@ import sys
 from app import app
 from shapely.geometry import LineString
 import shapely.geometry as sgeom
+from shapely import points
+from shapely.strtree import STRtree
 from status.profile_plots import iter_deployments, is_recent_data, is_recent_update
 from requests.exceptions import RequestException
 import numpy as np
@@ -21,9 +23,10 @@ import cartopy.io.shapereader as shpreader
 @lru_cache
 def get_land_geom():
     # Load higher-resolution land polygons for better accuracy
+    app.logger.info("Creating land mask")
     land_shp = shpreader.natural_earth(resolution='10m', category='physical', name='land')
     global land_geom
-    return list(shpreader.Reader(land_shp).geometries())
+    return STRtree(list(shpreader.Reader(land_shp).geometries()))
 
 
 def get_trajectory(erddap_url):
@@ -44,6 +47,7 @@ def get_trajectory(erddap_url):
     # list. The time variable will be removed before converting to GeoJSON
 
     valid_response = False
+    app.logger.info(f"Trying dataset related to: {erddap_url}")
     for qc_append in ("qartod_location_test_flag,", ""):
         url_append = url + f"?longitude,latitude,{qc_append}time&orderBy(%22time%22)"
         try:
@@ -138,6 +142,7 @@ def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = N
     times = geometry.get("time")
 
     # --- Step 0: Time filtering ---
+    app.logger.debug("time filtering")
     if min_time and times:
         min_dt = datetime.strptime(min_time, "%Y%m%dT%H%M")
         filtered = [((lon, lat), t) for (lon, lat), t in zip(geometry['coordinates'], times)
@@ -146,6 +151,7 @@ def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = N
     else:
         filtered_coords = geometry['coordinates']
 
+    app.logger.debug("flag filtering")
     # --- Step 1: Filter by flags and missing values ---
     if has_flag:
         filtered_coords = [
@@ -157,16 +163,25 @@ def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = N
                            if lon is not None and lat is not None]
  
     # --- Step 2: Remove points that fall on land ---
-    sea_coords = [(lon, lat) for lon, lat in filtered_coords if not is_on_land(lon, lat)]
+    app.logger.debug("land mask filtering")
+    sea_coords = filter_land(points(filtered_coords))
     
-    return {'coordinates': sea_coords}
+    return {'coordinates': [[coord.x, coord.y] for coord in sea_coords]}
 
 
-def is_on_land(lon, lat):
+def filter_land(pts):
     """Check if coordinate is on land using shapely polygons."""
-    land_geom = get_land_geom()
-    point = sgeom.Point(lon, lat)
-    return any(poly.contains(point) for poly in land_geom)
+    land_tree = get_land_geom()
+    app.logger.debug("returned land tree")
+    app.logger.debug("query tree")
+    pairs = land_tree.query(pts, predicate="intersects")
+    app.logger.debug("finish query tree")
+    land_idx = np.unique(pairs[0])
+
+    mask = np.ones(len(pts), dtype=bool)
+    mask[land_idx] = False
+
+    return pts[mask]
 
 
 def trajectory_exists(deployment):
