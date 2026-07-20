@@ -139,16 +139,18 @@ def get_dac_status(time_limit=600):
     # ERDDAP dataset exist
     for dac_record in dac_data:
         # check if record is unchanged via checksum
+        match = False
         current_dep_name = dac_record["name"]
         if current_dep_name in prev_status:
             prev_status_dep = prev_status[current_dep_name]
             prev_checksum = prev_status_dep.get("checksum", None)
             if prev_checksum == dac_record.get("checksum", None):
+                match = True
                 logger.info(
                     f"Previous checksum from status.json for deployment {current_dep_name} is unchanged, using cached contents"
                 )
                 meta = prev_status_dep
-        else:
+        if not match:
             # Initialize the metadata record
             meta = {variables[column]: None for column in columns}
 
