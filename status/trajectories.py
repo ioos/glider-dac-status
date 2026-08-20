@@ -20,7 +20,8 @@ os.environ["CARTOPY_DATA_DIR"] = "/tmp/cartopy"
 import cartopy.io.shapereader as shpreader
 from itertools import repeat
 from shapely.geometry import Point
-
+from haversine import haversine, Unit
+import shutil
 
 @lru_cache
 def get_land_geom():
@@ -51,12 +52,12 @@ def get_trajectory(erddap_url):
     valid_response = False
     app.logger.info(f"Trying dataset related to: {erddap_url}")
     for qc_append in ("qartod_location_test_flag,", ""):
-        url_append = url + f"?longitude,latitude,{qc_append}time&orderBy(%22time%22)"
+        url_append = url + f"?profile_id,longitude,latitude,{qc_append}time&orderBy(%22time%22)"
         try:
             response = requests.get(url_append, timeout=180, allow_redirects=True)
             response.raise_for_status()
         except RequestException as e:
-            app.logger.info(f"{e}")
+            app.logger.error(f"{e}")
             continue
         else:
             valid_response = True
@@ -72,6 +73,7 @@ def get_trajectory(erddap_url):
     rows = data["table"]["rows"]
 
     # Identify column indices dynamically
+    profile_idx = col_names.index("profile_id")
     lon_idx = col_names.index("longitude")
     lat_idx = col_names.index("latitude")
     time_idx = col_names.index("time")
@@ -92,7 +94,7 @@ def get_trajectory(erddap_url):
         geo_data,
         has_flag=True,
         min_time=min_time,
-        max_jump_m=200000
+        max_jump_km=200
     )
      
     # Simplify trajectory
@@ -114,34 +116,7 @@ def get_trajectory(erddap_url):
         "logs": cleaned["log"]}
 
 
-def get_path(deployment):
-    '''
-    Returns the path to the trajectory file
-
-    :param dict deployment: Dictionary containing the deployment metadata
-    '''
-    trajectory_dir = app.config.get('TRAJECTORY_DIR')
-    username = deployment['username']
-    name = deployment['name']
-    dir_path = os.path.join(trajectory_dir, username)
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-    file_path = os.path.join(dir_path, name + '.json')
-    return file_path
-
-
-def write_trajectory(deployment, geo_data):
-    '''
-    Writes a geojson like python structure to the appropriate data file
-
-    :param dict deployment: Dictionary containing the deployment metadata
-    :param dict geometry: A GeoJSON Geometry object
-    '''
-    file_path = get_path(deployment)
-    with open(file_path, 'w') as f:
-        f.write(json.dumps(geo_data))
-
-def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = None, max_jump_m: float = 200000):
+def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = None, max_jump_km: float = 200):
     """
     Filters out bad coordinate pairs based on:
       - minimum time threshold (if provided),
@@ -302,7 +277,7 @@ def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = N
             land_idx = np.unique(pairs[0]) if len(pairs) else np.array([], dtype=int)
             land_idx_set = set(land_idx.tolist())
         except Exception as e:
-            print(f"Step 2 land mask error: {e}")
+            app.logger.error(f"Step 2 land mask error: {e}")
             land_idx_set = set()
 
         for i, ((lon, lat), t) in enumerate(zip(coords, times)):
@@ -355,17 +330,17 @@ def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = N
     for i in range(1, len(coords)):
         prev_lon, prev_lat = cleaned_coords[-1]
         lon, lat = coords[i]
-        dist = haversine(prev_lon, prev_lat, lon, lat)
+        dist_km = haversine((prev_lat, prev_lon), (lat, lon), unit=Unit.KILOMETERS)
 
         
-        if dist > max_jump_m:
+        if dist_km > max_jump_km:
             removed.append({
                 "index": i,
                 "lon": lon,
                 "lat": lat,
                 "time": times[i],
-                "distance_m": dist,
-                "reason": f"distance > max_jump_m ({max_jump_m} m)",
+                "distance_km": dist_km,
+                "reason": f"distance > max_jump_km ({max_jump_km} km)",
             })
             continue
 
@@ -377,7 +352,7 @@ def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = N
         before_n,
         len(cleaned_coords),
         removed=removed,
-        note=f"max_jump_m={max_jump_m} m",
+        note=f"max_jump_km={max_jump_km} km",
     )
 
     return {
@@ -388,6 +363,66 @@ def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = N
     }
 
 
+def get_path(deployment):
+    '''
+    Returns the path to the trajectory file
+
+    :param dict deployment: Dictionary containing the deployment metadata
+    '''
+    trajectory_dir = app.config.get('TRAJECTORY_DIR')
+    username = deployment['username']
+    # name = deployment['name']
+    dir_path = os.path.join(trajectory_dir, username)
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    # file_path = os.path.join(dir_path, name + '.json')
+    # log_path = os.path.join(dir_path, name + '_log.json')
+    return dir_path #file_path, log_path
+
+
+def write_trajectory(deployment, geo_data):
+    '''
+    Writes a geojson like python structure to the appropriate data file
+
+    :param dict deployment: Dictionary containing the deployment metadata
+    :param dict geometry: A GeoJSON Geometry object
+    '''
+    name = deployment['name']
+    dir_path = get_path(deployment)
+    file_path = os.path.join(dir_path, name + '.json')
+    with open(file_path, 'w') as f:
+        f.write(json.dumps(geo_data))
+
+
+def write_trajectory_log(deployment, log_data):
+    '''
+    Writes a json like python structure to the appropriate data file
+
+    :param dict deployment: Dictionary containing the deployment metadata
+    :param dict log_data: A dictionary containing trajectory (lat/lon) outliers
+    '''
+    name = deployment['name']
+    dir_path = get_path(deployment)
+    log_path = os.path.join(dir_path, name + '_log.json')
+    with open(log_path, 'w') as f:
+        f.write(json.dumps(log_data))
+    
+
+def move_trajectory_log(deployment):
+    '''
+    Writes a json like python structure to the appropriate data file
+
+    :param dict deployment: Dictionary containing the deployment metadata
+    :param dict log_data: A dictionary containing trajectory (lat/lon) outliers
+    '''
+    name = deployment['name']
+    dir_path = get_path(deployment)
+    log_path = os.path.join(dir_path, name + '_log.json')
+    target_path = os.path.join(dir_path, 'past_issues')
+    if os.path.exists(log_path):
+        os.makedirs(target_path, exist_ok=True)
+        shutil.move(log_path, target_dir)
+
 def trajectory_exists(deployment):
     '''
     Returns True if the data is within the last week
@@ -395,7 +430,8 @@ def trajectory_exists(deployment):
     :param dict deployment: Dictionary containing the deployment metadata
     '''
 
-    file_path = get_path(deployment)
+    dir_path = get_path(deployment)
+    file_path = os.path.join(dir_path, name + '.json')
     return os.path.exists(file_path)
 
 
@@ -416,7 +452,13 @@ def generate_trajectories(deployments=None):
                 (recent_update or recent_data or not existing_trajectory
                 or not deployment["completed"])):
                 geo_data = get_trajectory(deployment['erddap'])
-                write_trajectory(deployment, geo_data)
+                write_trajectory(deployment, geo_data['geometry'])
+                log_issues = [entry for entry in geo_data["logs"] if entry.get("removed_points")]
+                if log_issues:
+                    write_trajectory_log(deployment, log_issues)
+                else:
+                    move_trajectory_log(deployment)
+                    
         except Exception:
             from traceback import print_exc
             print_exc()
