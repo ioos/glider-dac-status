@@ -38,7 +38,7 @@ def get_trajectory(erddap_url):
     structure. Filters by min_time from deployment date.
     '''
     # Example URL:
-    # https://gliders.ioos.us/erddap/tabledap/ru01-20140104T1621.json?latitude,longitude&time&orderBy(%22time%22)
+    # https://gliders.ioos.us/erddap/tabledap/ru01-20140104T1621.json?profile_id,latitude,longitude&time&orderBy(%22time%22)
 
     # get deployment time (e.g., 20250611T0000)
     min_time = erddap_url.split("/")[-1].replace(".html", "").split("-")[-1]
@@ -68,7 +68,7 @@ def get_trajectory(erddap_url):
 
     data = response.json()
 
-    # Map rows into lon/lat/time/flag
+    # Map rows into profileid/lon/lat/time/flag
     col_names = data["table"]["columnNames"]
     rows = data["table"]["rows"]
 
@@ -375,9 +375,7 @@ def get_path(deployment):
     dir_path = os.path.join(trajectory_dir, username)
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
-    # file_path = os.path.join(dir_path, name + '.json')
-    # log_path = os.path.join(dir_path, name + '_log.json')
-    return dir_path #file_path, log_path
+    return dir_path
 
 
 def write_trajectory(deployment, geo_data):
