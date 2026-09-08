@@ -34,7 +34,7 @@ def get_land_geom():
         category="physical",
         name="land",
     )
-    
+
     return STRtree(
         list(shpreader.Reader(land_shp).geometries())
     )
@@ -51,6 +51,7 @@ def calculate_distance_km(point_a, point_b):
 
     The haversine package expects: (latitude, longitude)
     """
+    app.logger.info("Calculating distance between points")
     lon_a, lat_a = point_a
     lon_b, lat_b = point_b
 
@@ -67,6 +68,7 @@ def parse_iso_time(value):
 
     Expected format: YYYY-MM-DDTHH:MM:SSZ
     """
+    app.logger.info("Parsing ISO timestamp")
     return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -74,6 +76,7 @@ def add_filter_log(log, step_name, before_n, after_n, removed=None, note=None):
     """
     Add a filter summary to the processing log.
     """
+    app.logger.info("Adding trajectory filter log entry")
     log.append({
         "step": step_name,
         "before": before_n,
@@ -93,6 +96,7 @@ def filter_by_min_time(coords, times, flags=None, min_time=None):
     tuple
         filtered coordinates, times, flags, and removed-point details
     """
+    app.logger.info("Filtering by minimum time")
     if not min_time:
         return coords, times, flags, []
 
@@ -109,6 +113,7 @@ def filter_by_min_time(coords, times, flags=None, min_time=None):
         try:
             keep = parse_iso_time(timestamp) >= min_datetime
         except (TypeError, ValueError):
+            app.logger.warning("Invalid timestamp encountered: %s", timestamp)
             keep = False
 
         if keep:
@@ -139,6 +144,7 @@ def filter_invalid_coordinates(coords, times, flags=None):
 
     A QC flag is considered valid when it is either None or equal to 1.
     """
+    app.logger.info("Filtering invalid coordinates")
     kept = []
     removed = []
 
@@ -188,6 +194,7 @@ def _land_tree_indices(land_tree, points):
     This function also handles the older query behavior that may return
     geometry objects.
     """
+    app.logger.info("Querying land tree for intersecting points")
     if not points:
         return set()
 
@@ -225,6 +232,7 @@ def filter_land_points(coords, times):
     """
     Remove coordinate points that intersect land.
     """
+    app.logger.info("Filtering land points")
     if not coords:
         return [], [], []
 
@@ -266,6 +274,7 @@ def filter_large_jumps(coords, times, max_jump_km):
 
     The first point is always retained.
     """
+    app.logger.info("Filtering large jumps with max_jump_km=%s", max_jump_km)
     if not coords:
         return [], [], []
 
@@ -297,7 +306,7 @@ def filter_large_jumps(coords, times, max_jump_km):
 
         cleaned_coords.append(current_point)
         cleaned_times.append(times[index])
-        
+
     return cleaned_coords, cleaned_times, removed
 
 
@@ -311,6 +320,7 @@ def get_trajectory(erddap_url):
 
     The trajectory is filtered from the deployment date onward.
     """
+    app.logger.info("Fetching trajectory from ERDDAP URL: %s", erddap_url)
     min_time = (
         erddap_url
         .split("/")[-1]
@@ -432,7 +442,7 @@ def get_trajectory(erddap_url):
         "geometry": geometry,
         "logs": cleaned["log"],
     }
-    
+
 
 
 # ---------------------------------------------------------------------------
@@ -456,6 +466,7 @@ def parse_geometry_with_checks(
     dict
         Contains profile IDs, cleaned coordinates, times, and filter logs.
     """
+    app.logger.info("Parsing geometry with checks")
     coords = geometry.get("coordinates", [])
     times = geometry.get("time", [])
     flags = geometry.get("flag", []) if has_flag else None
@@ -556,25 +567,27 @@ def get_path(deployment):
 
     :param dict deployment: Dictionary containing the deployment metadata
     '''
+    app.logger.info("Getting path for deployment: %s", deployment['name'])
     trajectory_dir = app.config.get('TRAJECTORY_DIR')
     username = deployment['username']
     dir_path = os.path.join(trajectory_dir, username)
     os.makedirs(dir_path, exist_ok=True)
-    
+
     return dir_path
 
 
 def write_trajectory(deployment, geo_data):
     '''
     Write the trajectory GeoJSON-like structure to disk.
-    
+
     :param dict deployment: Dictionary containing the deployment metadata
     :param dict geo_data: A GeoJSON Geometry object
     '''
+    app.logger.info("Writing trajectory for deployment: %s", deployment['name'])
     name = deployment['name']
     dir_path = get_path(deployment)
     file_path = os.path.join(dir_path, f"{name}.json")
-    
+
     with open(file_path, "w", encoding="utf-8") as file:
         json.dump(geo_data, file)
 
@@ -582,31 +595,34 @@ def write_trajectory(deployment, geo_data):
 def write_trajectory_log(deployment, log_data):
     '''
     Write trajectory filtering issues to disk.
-    
+
     :param dict deployment: Dictionary containing the deployment metadata
     :param dict log_data: A dictionary containing trajectory (lat/lon) outliers
     '''
+    app.logger.info("Writing trajectory log for deployment: %s", deployment['name'])
     name = deployment['name']
     dir_path = get_path(deployment)
     log_path = os.path.join(dir_path, f"{name}_log.json")
-    
+
     with open(log_path, "w", encoding="utf-8") as file:
         json.dump(log_data, file)
-    
+
 
 def move_trajectory_log(deployment):
     '''
     Move the current trajectory log into the past_issues directory.
-    
+
     :param dict deployment: Dictionary containing the deployment metadata
     '''
+    app.logger.info("Moving trajectory log to past_issues directory for deployment: %s", deployment['name'])
+
     name = deployment['name']
     dir_path = get_path(deployment)
     log_path = os.path.join(dir_path, f"{name}_log.json")
     target_path = os.path.join(dir_path, 'past_issues')
     if os.path.exists(log_path):
         os.makedirs(target_path, exist_ok=True)
-        shutil.move(log_path, target_dir)
+        shutil.move(log_path, target_path)
 
 def trajectory_exists(deployment):
     '''
@@ -614,10 +630,10 @@ def trajectory_exists(deployment):
 
     :param dict deployment: Dictionary containing the deployment metadata
     '''
-
+    app.logger.info("Checking if trajectory exists for deployment: %s", deployment['name'])
     dir_path = get_path(deployment)
     file_path = os.path.join(dir_path, f"{deployment['name']}.json")
-    
+
     return os.path.exists(file_path)
 
 
@@ -628,11 +644,13 @@ def generate_trajectories(deployments=None):
     """
     Determine which trajectories need to be built and write them to disk.
     """
+    app.logger.info("Generating trajectories for deployments: %s", deployments)
     for deployment in iter_deployments():
         if (
             deployments is not None
             and deployment["name"] not in deployments
         ):
+            app.logger.info("Skipping: Not in specified deployments, deployment: %s", deployment["name"])
             continue
 
         try:
@@ -641,7 +659,7 @@ def generate_trajectories(deployments=None):
             )
             recent_data = is_recent_data(deployment)
             existing_trajectory = trajectory_exists(deployment)
-            
+
             should_generate = (
                 not deployment["name"].endswith("-delayed")
                 and (
@@ -650,11 +668,12 @@ def generate_trajectories(deployments=None):
                     or not existing_trajectory
                     or not deployment["completed"]
                 )
-            )    
-            
+            )
+
             if not should_generate:
+                app.logger.info("Skipping: Should not generate trajectory for deployment: %s", deployment["name"])
                 continue
-            
+
             geo_data = get_trajectory(
                 deployment["erddap"]
             )
@@ -669,7 +688,7 @@ def generate_trajectories(deployments=None):
                 for entry in geo_data["logs"]
                 if entry.get("removed_points")
             ]
-            
+
             if log_issues:
                 write_trajectory_log(
                     deployment,
@@ -680,6 +699,7 @@ def generate_trajectories(deployments=None):
 
         except Exception:
             from traceback import print_exc
+            app.logger.error("Error generating trajectory for deployment: %s", deployment["name"])
 
             print_exc()
 
