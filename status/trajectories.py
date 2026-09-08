@@ -25,115 +25,437 @@ import shutil
 
 @lru_cache
 def get_land_geom():
-    # Load higher-resolution land polygons for better accuracy
+    """
+    Load the Natural Earth land polygons and return an STRtree.
+    """
     app.logger.info("Creating land mask")
-    land_shp = shpreader.natural_earth(resolution='10m', category='physical', name='land')
-    global land_geom
-    return STRtree(list(shpreader.Reader(land_shp).geometries()))
+    land_shp = shpreader.natural_earth(
+        resolution="10m",
+        category="physical",
+        name="land",
+    )
+    
+    return STRtree(
+        list(shpreader.Reader(land_shp).geometries())
+    )
 
 
-def get_trajectory(erddap_url):
-    '''
-    Reads the trajectory information from ERDDAP and returns a GEOJSON-like
-    structure. Filters by min_time from deployment date.
-    '''
-    # Example URL:
-    # https://gliders.ioos.us/erddap/tabledap/ru01-20140104T1621.json?profile_id,latitude,longitude&time&orderBy(%22time%22)
+# ---------------------------------------------------------------------------
+# Distance and filtering functions
+# ---------------------------------------------------------------------------
+def calculate_distance_km(point_a, point_b):
+    """
+    Calculate the distance between two points.
 
-    # get deployment time (e.g., 20250611T0000)
-    min_time = erddap_url.split("/")[-1].replace(".html", "").split("-")[-1]
+    Coordinates must be provided as: (longitude, latitude)
 
-    # fix url with json extension
-    url = erddap_url.replace("html", "json")
+    The haversine package expects: (latitude, longitude)
+    """
+    lon_a, lat_a = point_a
+    lon_b, lat_b = point_b
 
-    # ERDDAP requires the variable being sorted to be present in the variable
-    # list. The time variable will be removed before converting to GeoJSON
+    return haversine(
+        (lat_a, lon_a),
+        (lat_b, lon_b),
+        unit=Unit.KILOMETERS,
+    )
 
-    valid_response = False
-    app.logger.info(f"Trying dataset related to: {erddap_url}")
-    for qc_append in ("qartod_location_test_flag,", ""):
-        url_append = url + f"?profile_id,longitude,latitude,{qc_append}time&orderBy(%22time%22)"
+
+def parse_iso_time(value):
+    """
+    Parse an ERDDAP ISO timestamp.
+
+    Expected format: YYYY-MM-DDTHH:MM:SSZ
+    """
+    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+
+
+def add_filter_log(log, step_name, before_n, after_n, removed=None, note=None):
+    """
+    Add a filter summary to the processing log.
+    """
+    log.append({
+        "step": step_name,
+        "before": before_n,
+        "after": after_n,
+        "removed": before_n - after_n,
+        "note": note,
+        "removed_points": removed or [],
+    })
+
+
+def filter_by_min_time(coords, times, flags=None, min_time=None):
+    """
+    Remove points occurring before min_time or having invalid timestamps.
+
+    Returns
+    -------
+    tuple
+        filtered coordinates, times, flags, and removed-point details
+    """
+    if not min_time:
+        return coords, times, flags, []
+
+    min_datetime = datetime.strptime(min_time, "%Y%m%dT%H%M")
+
+    kept = []
+    removed = []
+
+    flag_iter = flags if flags is not None else repeat(None)
+
+    for coordinate, timestamp, flag in zip(coords, times, flag_iter):
+        lon, lat = coordinate
+
         try:
-            response = requests.get(url_append, timeout=180, allow_redirects=True)
-            response.raise_for_status()
-        except RequestException as e:
-            app.logger.error(f"{e}")
-            continue
-        else:
-            valid_response = True
-            break
+            keep = parse_iso_time(timestamp) >= min_datetime
+        except (TypeError, ValueError):
+            keep = False
 
-    if not valid_response:
-        app.logger.error(f"Failed to fetch trajectories: {url_append}")
+        if keep:
+            kept.append((coordinate, timestamp, flag))
+        else:
+            removed.append({
+                "lon": lon,
+                "lat": lat,
+                "time": timestamp,
+                "flag": flag,
+                "reason": "before min_time or invalid time",
+            })
+
+    filtered_coords = [item[0] for item in kept]
+    filtered_times = [item[1] for item in kept]
+
+    if flags is not None:
+        filtered_flags = [item[2] for item in kept]
+    else:
+        filtered_flags = None
+
+    return filtered_coords, filtered_times, filtered_flags, removed
+
+
+def filter_invalid_coordinates(coords, times, flags=None):
+    """
+    Remove points with missing coordinates or invalid QC flags.
+
+    A QC flag is considered valid when it is either None or equal to 1.
+    """
+    kept = []
+    removed = []
+
+    flag_iter = flags if flags is not None else repeat(None)
+
+    for coordinate, timestamp, flag in zip(coords, times, flag_iter):
+        lon, lat = coordinate
+
+        if lon is None or lat is None:
+            removed.append({
+                "lon": lon,
+                "lat": lat,
+                "time": timestamp,
+                "flag": flag,
+                "reason": "missing lon or lat",
+            })
+            continue
+
+        if flag is not None and flag != 1:
+            removed.append({
+                "lon": lon,
+                "lat": lat,
+                "time": timestamp,
+                "flag": flag,
+                "reason": "flag != 1",
+            })
+            continue
+
+        kept.append((coordinate, timestamp, flag))
+
+    filtered_coords = [item[0] for item in kept]
+    filtered_times = [item[1] for item in kept]
+
+    if flags is not None:
+        filtered_flags = [item[2] for item in kept]
+    else:
+        filtered_flags = None
+
+    return filtered_coords, filtered_times, filtered_flags, removed
+
+
+def _land_tree_indices(land_tree, points):
+    """
+    Return the indices of points that intersect land.
+
+    Shapely 2.x returns an array of tree indices for a vectorized query.
+    This function also handles the older query behavior that may return
+    geometry objects.
+    """
+    if not points:
+        return set()
+
+    try:
+        query_result = land_tree.query(
+            points,
+            predicate="intersects",
+        )
+
+        if len(query_result) == 0:
+            return set()
+
+        query_array = np.asarray(query_result)
+
+        # Shapely 2.x vectorized query returns a 2 x N array:
+        # [input_geometry_index, tree_geometry_index]
+        if query_array.ndim == 2 and query_array.shape[0] == 2:
+            return set(query_array[0].tolist())
+
+        # Some Shapely versions may return a one-dimensional array
+        # containing input indices.
+        if query_array.ndim == 1 and np.issubdtype(
+            query_array.dtype,
+            np.integer,
+        ):
+            return set(query_array.tolist())
+
+    except Exception as exc:
+        app.logger.error("Land mask query failed: %s", exc)
+
+    return set()
+
+
+def filter_land_points(coords, times):
+    """
+    Remove coordinate points that intersect land.
+    """
+    if not coords:
+        return [], [], []
+
+    try:
+        land_tree = get_land_geom()
+        points = [Point(lon, lat) for lon, lat in coords]
+        land_indices = _land_tree_indices(land_tree, points)
+    except Exception as exc:
+        app.logger.error("Step 2 land mask error: %s", exc)
+        land_indices = set()
+
+    kept = []
+    removed = []
+
+    for index, (coordinate, timestamp) in enumerate(zip(coords, times)):
+        lon, lat = coordinate
+
+        if index in land_indices:
+            removed.append({
+                "lon": lon,
+                "lat": lat,
+                "time": timestamp,
+                "flag": None,
+                "reason": "on land",
+            })
+        else:
+            kept.append((coordinate, timestamp))
+
+    filtered_coords = [item[0] for item in kept]
+    filtered_times = [item[1] for item in kept]
+
+    return filtered_coords, filtered_times, removed
+
+
+def filter_large_jumps(coords, times, max_jump_km):
+    """
+    Remove points that are farther than max_jump_km from the previous
+    accepted point.
+
+    The first point is always retained.
+    """
+    if not coords:
+        return [], [], []
+
+    cleaned_coords = [coords[0]]
+    cleaned_times = [times[0]]
+    removed = []
+
+    for index in range(1, len(coords)):
+        previous_point = cleaned_coords[-1]
+        current_point = coords[index]
+
+        distance_km = calculate_distance_km(
+            previous_point,
+            current_point,
+        )
+
+        if distance_km > max_jump_km:
+            removed.append({
+                "index": index,
+                "lon": current_point[0],
+                "lat": current_point[1],
+                "time": times[index],
+                "distance_km": distance_km,
+                "reason": (
+                    f"distance > max_jump_km ({max_jump_km} km)"
+                ),
+            })
+            continue
+
+        cleaned_coords.append(current_point)
+        cleaned_times.append(times[index])
+        
+    return cleaned_coords, cleaned_times, removed
+
+
+# ---------------------------------------------------------------------------
+# ERDDAP handling
+# ---------------------------------------------------------------------------
+def get_trajectory(erddap_url):
+    """
+    Read trajectory information from ERDDAP and return a GeoJSON-like
+    structure.
+
+    The trajectory is filtered from the deployment date onward.
+    """
+    min_time = (
+        erddap_url
+        .split("/")[-1]
+        .replace(".html", "")
+        .split("-")[-1]
+    )
+
+    url = erddap_url.replace(".html", ".json")
+
+    response = None
+    last_url = None
+
+    app.logger.info("Trying dataset related to: %s", erddap_url)
+
+    for qc_append in (
+        "qartod_location_test_flag,",
+        "",
+    ):
+        last_url = (
+            f"{url}?profile_id,longitude,latitude,"
+            f"{qc_append}time&orderBy(%22time%22)"
+        )
+
+        try:
+            response = requests.get(
+                last_url,
+                timeout=180,
+                allow_redirects=True,
+            )
+            response.raise_for_status()
+            break
+        except RequestException as exc:
+            app.logger.error(
+                "Failed to fetch trajectory from %s: %s",
+                last_url,
+                exc,
+            )
+            response = None
+
+    if response is None:
+        raise RuntimeError(
+            f"Failed to fetch trajectory data from {url}"
+        )
 
     data = response.json()
 
-    # Map rows into profileid/lon/lat/time/flag
-    col_names = data["table"]["columnNames"]
+    column_names = data["table"]["columnNames"]
     rows = data["table"]["rows"]
 
-    # Identify column indices dynamically
-    profile_idx = col_names.index("profile_id")
-    lon_idx = col_names.index("longitude")
-    lat_idx = col_names.index("latitude")
-    time_idx = col_names.index("time")
-    flag_idx = col_names.index("qartod_location_test_flag") if "qartod_location_test_flag" in col_names else None
+    profile_idx = column_names.index("profile_id")
+    lon_idx = column_names.index("longitude")
+    lat_idx = column_names.index("latitude")
+    time_idx = column_names.index("time")
+
+    flag_idx = (
+        column_names.index("qartod_location_test_flag")
+        if "qartod_location_test_flag" in column_names
+        else None
+    )
 
     geo_data = {
         "type": "LineString",
-        "profileid": [r[profile_idx] for r in rows],
-        "coordinates": [(r[lon_idx], r[lat_idx]) for r in rows],
-        "time": [r[time_idx] for r in rows],
-        "flag": [r[flag_idx] for r in rows] if flag_idx is not None else None,
+        "profileid": [row[profile_idx] for row in rows],
+        "coordinates": [
+            (row[lon_idx], row[lat_idx])
+            for row in rows
+        ],
+        "time": [row[time_idx] for row in rows],
+        "flag": (
+            [row[flag_idx] for row in rows]
+            if flag_idx is not None
+            else None
+        ),
     }
 
     raw_coords = geo_data["coordinates"]
 
-    # Call your parse function with min_time filter and max jump distance
     cleaned = parse_geometry_with_checks(
         geo_data,
-        has_flag=True,
+        has_flag=geo_data["flag"] is not None,
         min_time=min_time,
-        max_jump_km=200
+        max_jump_km=200,
     )
-     
-    # Simplify trajectory
-    coords = LineString(cleaned["coordinates"])
-    trajectory = coords.simplify(0.02, preserve_topology=False)
 
-    geometry = {
-        "type": "LineString",
-        "coordinates": list(trajectory.coords),
-        "properties": {
-            "oceansmap_type": "glider",
+    cleaned_coords = cleaned["coordinates"]
+
+    if len(cleaned_coords) >= 2:
+        trajectory = LineString(cleaned_coords).simplify(
+            0.02,
+            preserve_topology=False,
+        )
+        geometry = {
+            "type": "LineString",
+            "coordinates": list(trajectory.coords),
+            "properties": {
+                "oceansmap_type": "glider",
+            },
         }
-    }
+    elif len(cleaned_coords) == 1:
+        geometry = {
+            "type": "Point",
+            "coordinates": cleaned_coords[0],
+            "properties": {
+                "oceansmap_type": "glider",
+            },
+        }
+    else:
+        geometry = {
+            "type": "LineString",
+            "coordinates": [],
+            "properties": {
+                "oceansmap_type": "glider",
+            },
+        }
 
     return {
         "raw_coordinates": raw_coords,
-        "cleaned_coordinates": cleaned["coordinates"],
+        "cleaned_coordinates": cleaned_coords,
         "geometry": geometry,
-        "logs": cleaned["log"]}
+        "logs": cleaned["log"],
+    }
+    
 
 
-def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = None, max_jump_km: float = 200):
+# ---------------------------------------------------------------------------
+# Geometry processing
+# ---------------------------------------------------------------------------
+def parse_geometry_with_checks(
+    geometry,
+    has_flag,
+    min_time=None,
+    max_jump_km=200,):
     """
-    Filters out bad coordinate pairs based on:
-      - minimum time threshold (if provided),
-      - flags,
-      - missing coordinates,
-      - land masking,
-      - distance-based big-jump detection.
+    Filter trajectory coordinates using the following steps:
+
+    1. Minimum timestamp filtering.
+    2. Missing coordinate and QC flag filtering.
+    3. Land masking.
+    4. Large-jump distance filtering.
 
     Returns
     -------
-    dict with:
-      - profileid
-      - coordinates
-      - times
-      - log
+    dict
+        Contains profile IDs, cleaned coordinates, times, and filter logs.
     """
-
     coords = geometry.get("coordinates", [])
     times = geometry.get("time", [])
     flags = geometry.get("flag", []) if has_flag else None
@@ -141,161 +463,57 @@ def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = N
 
     log = []
 
-    def add_log(step_name, before_n, after_n, removed=None, note=None):
-        log.append({
-            "step": step_name,
-            "before": before_n,
-            "after": after_n,
-            "removed": before_n - after_n,
-            "note": note,
-            "removed_points": removed or [],
-        })
-
-    def parse_iso_time(t):
-        return datetime.strptime(t, "%Y-%m-%dT%H:%M:%SZ")
-
-    #--------------------
-    #Step 0: Time filter
-    #--------------------
+    # Step 0: Minimum time filter
     before_n = len(coords)
-    if min_time and times:
-        min_dt = datetime.strptime(min_time, "%Y%m%dT%H%M")
-        kept = []
-        removed = []
 
-        flag_iter = flags if has_flag else repeat(None)
-    
-        for (lon, lat), t, flag in zip(coords, times, flag_iter):
-            try:
-                keep = parse_iso_time(t) >= min_dt
-            except Exception:
-                keep = False
+    coords, times, flags, removed = filter_by_min_time(
+        coords,
+        times,
+        flags,
+        min_time,
+    )
 
-            if keep:
-                kept.append(((lon, lat), t, flag))
-            else:
-                removed.append({
-                    "lon": lon,
-                    "lat": lat,
-                    "time": t,
-                    "flag": flag,
-                    "reason": "before min_time or invalid time",
-                })
-        
-        coords = [xy for xy, _, _ in kept]
-        times = [t for _, t, _ in kept]
-        if has_flag:
-            flags = [f for _, _, f in kept]
+    add_filter_log(
+        log,
+        "step_0_time_filter",
+        before_n,
+        len(coords),
+        removed=removed,
+        note=(
+            f"min_time={min_time}"
+            if min_time
+            else "No min_time filter applied"
+        ),
+    )
 
-        add_log(
-            "step_0_time_filter",
-            before_n,
-            len(coords),
-            removed=removed,
-            note=f"min_time={min_time}",
-        )
-    else:
-        add_log(
-            "step_0_time_filter",
-            before_n,
-            before_n,
-            removed=[],
-            note="No min_time filter applied",
-        )
-
-    # -----------------------------------
-    # Step 1: Flag / missing value filter
-    # -----------------------------------
+    # Step 1: Missing values and QC flag filter
     before_n = len(coords)
-    kept = []
-    removed = []
 
-    if has_flag:
-        for (lon, lat), t, flag in zip(coords, times, flags):
-            if lon is None or lat is None:
-                removed.append({
-                    "lon": lon,
-                    "lat": lat,
-                    "time": t,
-                    "flag": flag,
-                    "reason": "missing lon or lat",
-                })
-            elif flag is not None and flag != 1:
-                removed.append({
-                    "lon": lon,
-                    "lat": lat,
-                    "time": t,
-                    "flag": flag,
-                    "reason": "flag != 1",
-                })
-            else:
-                kept.append(((lon, lat), t, flag))
+    coords, times, flags, removed = filter_invalid_coordinates(
+        coords,
+        times,
+        flags,
+    )
 
-        coords = [xy for xy, _, _ in kept]
-        times = [t for _, t, _ in kept]
-        flags = [f for _, _, f in kept]
-
-    else:
-        for (lon, lat), t in zip(coords, times):
-            if lon is None or lat is None:
-                removed.append({
-                    "lon": lon,
-                    "lat": lat,
-                    "time": t,
-                    "flag": None,
-                    "reason": "missing lon or lat",
-                })
-            else:
-                kept.append(((lon, lat), t))
-
-        coords = [xy for xy, _ in kept]
-        times = [t for _, t in kept]
-
-    add_log(
+    add_filter_log(
+        log,
         "step_1_flag_and_missing_filter",
         before_n,
         len(coords),
         removed=removed,
-        note="Kept points with valid lon/lat and acceptable flag",
+        note="Kept points with valid coordinates and acceptable flags",
     )
 
-    # --------------------
-    # Step 2: Land masking
-    # --------------------
+    # Step 2: Land mask
     before_n = len(coords)
-    kept = []
-    removed = []
 
-    if coords:
-        try:
-            land_tree = get_land_geom()
-            app.logger.debug("returned land tree")
-            app.logger.debug("query tree")
-            pts = [Point(lon, lat) for lon, lat in coords]
-            pairs = land_tree.query(pts, predicate="intersects")
-            app.logger.debug("finish query tree")
-            land_idx = np.unique(pairs[0]) if len(pairs) else np.array([], dtype=int)
-            land_idx_set = set(land_idx.tolist())
-        except Exception as e:
-            app.logger.error(f"Step 2 land mask error: {e}")
-            land_idx_set = set()
+    coords, times, removed = filter_land_points(
+        coords,
+        times,
+    )
 
-        for i, ((lon, lat), t) in enumerate(zip(coords, times)):
-            if i in land_idx_set:
-                removed.append({
-                    "lon": lon,
-                    "lat": lat,
-                    "time": t,
-                    "flag": None,
-                    "reason": "on land",
-                })
-            else:
-                kept.append(((lon, lat), t))
-
-    coords = [xy for xy, _ in kept]
-    times = [t for _, t in kept]
-
-    add_log(
+    add_filter_log(
+        log,
         "step_2_land_mask",
         before_n,
         len(coords),
@@ -303,119 +521,88 @@ def parse_geometry_with_checks(geometry: dict, has_flag: bool, min_time: str = N
         note="Removed points that fall on land",
     )
 
-    # --------------------
-    # Step 3: Big-jump distance filter
-    # --------------------
-    # this is to verify if the outlier added manually are presentin the array    
+    # Step 3: Large-jump filter
     before_n = len(coords)
-    if not coords:
-        add_log(
-            "step_3_big_jump_filter",
-            before_n,
-            0,
-            removed=[],
-            note="No coordinates left after earlier filters",
-        )
-        return {
-            "profileid": profileid,
-            "coordinates": [],
-            "times": [],
-            "log": log,
-        }
 
-    cleaned_coords = [coords[0]]
-    cleaned_times = [times[0]]
-    removed = []
+    coords, times, removed = filter_large_jumps(
+        coords,
+        times,
+        max_jump_km,
+    )
 
-    for i in range(1, len(coords)):
-        prev_lon, prev_lat = cleaned_coords[-1]
-        lon, lat = coords[i]
-        dist_km = haversine((prev_lat, prev_lon), (lat, lon), unit=Unit.KILOMETERS)
-
-        
-        if dist_km > max_jump_km:
-            removed.append({
-                "index": i,
-                "lon": lon,
-                "lat": lat,
-                "time": times[i],
-                "distance_km": dist_km,
-                "reason": f"distance > max_jump_km ({max_jump_km} km)",
-            })
-            continue
-
-        cleaned_coords.append((lon, lat))
-        cleaned_times.append(times[i])
-
-    add_log(
+    add_filter_log(
+        log,
         "step_3_big_jump_filter",
         before_n,
-        len(cleaned_coords),
+        len(coords),
         removed=removed,
         note=f"max_jump_km={max_jump_km} km",
     )
 
     return {
         "profileid": profileid,
-        "coordinates": cleaned_coords,
-        "times": cleaned_times,
-        "log": log, 
+        "coordinates": coords,
+        "times": times,
+        "log": log,
     }
 
 
+# ---------------------------------------------------------------------------
+# File handling
+# ---------------------------------------------------------------------------
 def get_path(deployment):
     '''
-    Returns the path to the trajectory file
+    Returns the path of the trajectory file
 
     :param dict deployment: Dictionary containing the deployment metadata
     '''
     trajectory_dir = app.config.get('TRAJECTORY_DIR')
     username = deployment['username']
-    # name = deployment['name']
     dir_path = os.path.join(trajectory_dir, username)
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
+    os.makedirs(dir_path, exist_ok=True)
+    
     return dir_path
 
 
 def write_trajectory(deployment, geo_data):
     '''
-    Writes a geojson like python structure to the appropriate data file
-
+    Write the trajectory GeoJSON-like structure to disk.
+    
     :param dict deployment: Dictionary containing the deployment metadata
-    :param dict geometry: A GeoJSON Geometry object
+    :param dict geo_data: A GeoJSON Geometry object
     '''
     name = deployment['name']
     dir_path = get_path(deployment)
-    file_path = os.path.join(dir_path, name + '.json')
-    with open(file_path, 'w') as f:
-        f.write(json.dumps(geo_data))
+    file_path = os.path.join(dir_path, f"{name}.json")
+    
+    with open(file_path, "w", encoding="utf-8") as file:
+        json.dump(geo_data, file)
 
 
 def write_trajectory_log(deployment, log_data):
     '''
-    Writes a json like python structure to the appropriate data file
-
+    Write trajectory filtering issues to disk.
+    
     :param dict deployment: Dictionary containing the deployment metadata
     :param dict log_data: A dictionary containing trajectory (lat/lon) outliers
     '''
     name = deployment['name']
     dir_path = get_path(deployment)
-    log_path = os.path.join(dir_path, name + '_log.json')
-    with open(log_path, 'w') as f:
-        f.write(json.dumps(log_data))
+    log_path = os.path.join(dir_path, f"{name}_log.json")
+    
+    with open(log_path, "w", encoding="utf-8") as file:
+        json.dump(log_data, file)
     
 
 def move_trajectory_log(deployment):
     '''
-    Writes a json like python structure to the appropriate data file
-
+    Move the current trajectory log into the past_issues directory.
+    
     :param dict deployment: Dictionary containing the deployment metadata
-    :param dict log_data: A dictionary containing trajectory (lat/lon) outliers
     '''
     name = deployment['name']
     dir_path = get_path(deployment)
-    log_path = os.path.join(dir_path, name + '_log.json')
+    log_path = os.path.join(dir_path, f"{name}_log.json")
     target_path = os.path.join(dir_path, 'past_issues')
     if os.path.exists(log_path):
         os.makedirs(target_path, exist_ok=True)
@@ -423,43 +610,79 @@ def move_trajectory_log(deployment):
 
 def trajectory_exists(deployment):
     '''
-    Returns True if the data is within the last week
+    Return True if a trajectory file already exists.
 
     :param dict deployment: Dictionary containing the deployment metadata
     '''
 
     dir_path = get_path(deployment)
-    file_path = os.path.join(dir_path, name + '.json')
+    file_path = os.path.join(dir_path, f"{deployment['name']}.json")
+    
     return os.path.exists(file_path)
 
 
+# ---------------------------------------------------------------------------
+# Trajectory generation
+# ---------------------------------------------------------------------------
 def generate_trajectories(deployments=None):
-    '''
-    Determine which trajectories need to be built, and write geojson to file
-    '''
-    # TODO: Use a less brute force approach to filtering
+    """
+    Determine which trajectories need to be built and write them to disk.
+    """
     for deployment in iter_deployments():
-        if deployments is not None and deployment["name"] not in deployments:
+        if (
+            deployments is not None
+            and deployment["name"] not in deployments
+        ):
             continue
+
         try:
-            # Only add if the deployment has been recently updated or the data is recent
-            recent_update = is_recent_update(deployment['updated'])
+            recent_update = is_recent_update(
+                deployment["updated"]
+            )
             recent_data = is_recent_data(deployment)
             existing_trajectory = trajectory_exists(deployment)
-            if (not deployment["name"].endswith("-delayed") and
-                (recent_update or recent_data or not existing_trajectory
-                or not deployment["completed"])):
-                geo_data = get_trajectory(deployment['erddap'])
-                write_trajectory(deployment, geo_data['geometry'])
-                log_issues = [entry for entry in geo_data["logs"] if entry.get("removed_points")]
-                if log_issues:
-                    write_trajectory_log(deployment, log_issues)
-                else:
-                    move_trajectory_log(deployment)
-                    
+            
+            should_generate = (
+                not deployment["name"].endswith("-delayed")
+                and (
+                    recent_update
+                    or recent_data
+                    or not existing_trajectory
+                    or not deployment["completed"]
+                )
+            )    
+            
+            if not should_generate:
+                continue
+            
+            geo_data = get_trajectory(
+                deployment["erddap"]
+            )
+
+            write_trajectory(
+                deployment,
+                geo_data["geometry"],
+            )
+
+            log_issues = [
+                entry
+                for entry in geo_data["logs"]
+                if entry.get("removed_points")
+            ]
+            
+            if log_issues:
+                write_trajectory_log(
+                    deployment,
+                    log_issues,
+                )
+            else:
+                move_trajectory_log(deployment)
+
         except Exception:
             from traceback import print_exc
+
             print_exc()
+
     return 0
 
 
